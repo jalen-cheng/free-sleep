@@ -13,6 +13,9 @@ UPDATER_UNITS="swupdate.service swupdate.socket swupdate-progress.service defibr
 BLOCKED_HOSTS="raw-api-upload.8slp.net update-api.8slp.net device-api.8slp.net"
 HOSTS_FILE="${HOSTS_FILE:-/etc/hosts}"
 HOSTS_MARKER="# free-sleep-updater-lockout"
+# Units masked by this script. Units that were already masked (install step 11) are left out,
+# so "disable" never re-enables an updater that was turned off before this script ran.
+MASKED_UNITS_FILE="${MASKED_UNITS_FILE:-/etc/free-sleep/updater_lockout_units}"
 
 # Succeeds when systemd has a unit file with exactly this name.
 unit_exists() {
@@ -27,11 +30,15 @@ remove_hosts_entries() {
 
 enable_lockout() {
   for unit_name in $UPDATER_UNITS; do
-    if unit_exists "$unit_name"; then
-      systemctl mask --now "$unit_name"
-      echo "Masked $unit_name"
-    else
+    if ! unit_exists "$unit_name"; then
       echo "WARNING: unit '$unit_name' not found on this Pod, skipping" >&2
+    elif [ "$(systemctl is-enabled "$unit_name" 2>/dev/null || true)" = "masked" ]; then
+      echo "$unit_name is already masked"
+    else
+      systemctl mask --now "$unit_name"
+      mkdir -p "$(dirname "$MASKED_UNITS_FILE")"
+      echo "$unit_name" >> "$MASKED_UNITS_FILE"
+      echo "Masked $unit_name"
     fi
   done
 
@@ -43,14 +50,16 @@ enable_lockout() {
 }
 
 disable_lockout() {
-  for unit_name in $UPDATER_UNITS; do
-    if unit_exists "$unit_name"; then
+  if [ -f "$MASKED_UNITS_FILE" ]; then
+    while read -r unit_name; do
+      [ -n "$unit_name" ] || continue
       systemctl unmask "$unit_name"
       echo "Unmasked $unit_name (not started; start it or reboot if you want it running)"
-    fi
-  done
+    done < "$MASKED_UNITS_FILE"
+    rm -f "$MASKED_UNITS_FILE"
+  fi
   remove_hosts_entries
-  echo "Updater lockout disabled."
+  echo "Updater lockout disabled. Units that were masked before the lockout stay masked."
 }
 
 case "${1:-}" in

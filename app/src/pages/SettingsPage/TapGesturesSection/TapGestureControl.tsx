@@ -6,6 +6,7 @@ import { z } from 'zod';
 
 import { TapConfig } from '@api/settingsSchema.ts';
 import { useAppStore } from '@state/appStore.tsx';
+import { formatTemperatureDelta } from '@lib/temperatureConversions.ts';
 import SettingToggle from '../SettingToggle.tsx';
 
 type TapConfigValue = z.infer<typeof TapConfig>;
@@ -29,13 +30,14 @@ const toggleGroupSx = { width: '100%', '& .MuiToggleButton-root': { flex: 1, py:
 
 type TapGestureControlProps = {
   label: string;
+  displayCelsius: boolean;
   tapConfig: TapConfigValue;
   // Always receives a complete config: the server replaces a gesture's config as a whole
   onChange: (tapConfig: TapConfigValue) => void;
 }
 
 // Editor for one tap gesture: what it does, and the options for that action.
-export default function TapGestureControl({ label, tapConfig, onChange }: TapGestureControlProps) {
+export default function TapGestureControl({ label, displayCelsius, tapConfig, onChange }: TapGestureControlProps) {
   const { isUpdating } = useAppStore();
 
   const handleTypeChange = (_: React.MouseEvent<HTMLElement>, newType: TapConfigValue['type'] | null) => {
@@ -86,7 +88,7 @@ export default function TapGestureControl({ label, tapConfig, onChange }: TapGes
             sx={ { width: 96, flexShrink: 0 } }
           >
             { TEMPERATURE_AMOUNTS_F.map(amount => (
-              <MenuItem key={ amount } value={ amount }>{ amount }°F</MenuItem>
+              <MenuItem key={ amount } value={ amount }>{ formatTemperatureDelta(amount, displayCelsius) }</MenuItem>
             )) }
           </TextField>
         </Box>
