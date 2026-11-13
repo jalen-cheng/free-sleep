@@ -54,10 +54,24 @@ if [ -d /home/dac/free-sleep ]; then
   mv /home/dac/free-sleep $BACKUP_PATH
 fi
 
-echo "Attempting to reinstall free-sleep..."
+# Update from the source saved by install.sh, so a fork is not replaced by upstream on update
+UPDATE_SOURCE_CONFIG="/etc/free-sleep/update_source.conf"
+read_saved_update_source() {
+  if [ -f "$UPDATE_SOURCE_CONFIG" ]; then
+    grep -E "^$1=[A-Za-z0-9._/-]+\$" "$UPDATE_SOURCE_CONFIG" | tail -n 1 | cut -d= -f2 || true
+  fi
+}
+FREE_SLEEP_REPO="${FREE_SLEEP_REPO:-$(read_saved_update_source FREE_SLEEP_REPO)}"
+FREE_SLEEP_REPO="${FREE_SLEEP_REPO:-throwaway31265/free-sleep}"
+FREE_SLEEP_BRANCH="${FREE_SLEEP_BRANCH:-$(read_saved_update_source FREE_SLEEP_BRANCH)}"
+FREE_SLEEP_BRANCH="${FREE_SLEEP_BRANCH:-main}"
+export FREE_SLEEP_REPO FREE_SLEEP_BRANCH
+INSTALLER_URL="https://raw.githubusercontent.com/$FREE_SLEEP_REPO/$FREE_SLEEP_BRANCH/scripts/install.sh"
+
+echo "Attempting to reinstall free-sleep from $FREE_SLEEP_REPO ($FREE_SLEEP_BRANCH)..."
 update_succeeded=false
 # Check the download separately: running an empty script after a failed curl exits successfully.
-if installer_source=$(curl -fsSL https://raw.githubusercontent.com/throwaway31265/free-sleep/main/scripts/install.sh) \
+if installer_source=$(curl -fsSL "$INSTALLER_URL") \
   && [ -n "$installer_source" ] \
   && /bin/bash -c "$installer_source" \
   && [ -d "$APP_DIR" ]; then

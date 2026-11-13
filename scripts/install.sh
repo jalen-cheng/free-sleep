@@ -4,7 +4,27 @@ set -euo pipefail
 
 # --------------------------------------------------------------------------------
 # Variables
-REPO_URL="https://github.com/throwaway31265/free-sleep/archive/refs/heads/main.zip"
+# Install source. Forks set FREE_SLEEP_REPO / FREE_SLEEP_BRANCH once on the first install; the
+# values are saved so later updates (including the in-app update button) keep using the same source.
+UPDATE_SOURCE_CONFIG="/etc/free-sleep/update_source.conf"
+read_saved_update_source() {
+  if [ -f "$UPDATE_SOURCE_CONFIG" ]; then
+    grep -E "^$1=[A-Za-z0-9._/-]+\$" "$UPDATE_SOURCE_CONFIG" | tail -n 1 | cut -d= -f2 || true
+  fi
+}
+FREE_SLEEP_REPO="${FREE_SLEEP_REPO:-$(read_saved_update_source FREE_SLEEP_REPO)}"
+FREE_SLEEP_REPO="${FREE_SLEEP_REPO:-throwaway31265/free-sleep}"
+FREE_SLEEP_BRANCH="${FREE_SLEEP_BRANCH:-$(read_saved_update_source FREE_SLEEP_BRANCH)}"
+FREE_SLEEP_BRANCH="${FREE_SLEEP_BRANCH:-main}"
+for source_value in "$FREE_SLEEP_REPO" "$FREE_SLEEP_BRANCH"; do
+  if ! echo "$source_value" | grep -Eq '^[A-Za-z0-9._/-]+$'; then
+    echo "Invalid FREE_SLEEP_REPO or FREE_SLEEP_BRANCH: $source_value" >&2
+    exit 1
+  fi
+done
+REPO_URL="https://github.com/$FREE_SLEEP_REPO/archive/refs/heads/$FREE_SLEEP_BRANCH.zip"
+# GitHub names the zip's top folder <repo>-<branch>, with slashes in the branch turned into dashes
+EXTRACTED_DIR="${FREE_SLEEP_REPO##*/}-$(echo "$FREE_SLEEP_BRANCH" | tr / -)"
 ZIP_FILE="free-sleep.zip"
 REPO_DIR="/home/dac/free-sleep"
 SERVER_DIR="$REPO_DIR/server"
@@ -27,8 +47,8 @@ done
 
 # --------------------------------------------------------------------------------
 # Download the repository
-echo "Downloading the repository..."
-curl -L -o "$ZIP_FILE" "$REPO_URL"
+echo "Downloading the repository from $FREE_SLEEP_REPO ($FREE_SLEEP_BRANCH)..."
+curl -fL -o "$ZIP_FILE" "$REPO_URL"
 
 echo ""
 echo "Unzipping the repository..."
@@ -39,7 +59,10 @@ rm -f "$ZIP_FILE"
 # Clean up existing directory and move new code into place
 echo "Setting up the installation directory..."
 rm -rf "$REPO_DIR"
-mv free-sleep-main "$REPO_DIR"
+mv "$EXTRACTED_DIR" "$REPO_DIR"
+
+mkdir -p "$(dirname "$UPDATE_SOURCE_CONFIG")"
+printf 'FREE_SLEEP_REPO=%s\nFREE_SLEEP_BRANCH=%s\n' "$FREE_SLEEP_REPO" "$FREE_SLEEP_BRANCH" > "$UPDATE_SOURCE_CONFIG"
 
 
 chown -R "$USERNAME":"$USERNAME" "$REPO_DIR"

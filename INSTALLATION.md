@@ -196,6 +196,12 @@ nmcli connection reload
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/throwaway31265/free-sleep/main/scripts/install.sh)"
 ```
 
+Installing a fork? Set the source once. It is saved to `/etc/free-sleep/update_source.conf` and reused by every later update, including the update button in the app:
+```
+export FREE_SLEEP_REPO=<github-user>/free-sleep FREE_SLEEP_BRANCH=main
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/$FREE_SLEEP_REPO/$FREE_SLEEP_BRANCH/scripts/install.sh)"
+```
+
 ---
 
 
