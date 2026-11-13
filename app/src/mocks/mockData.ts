@@ -515,7 +515,15 @@ export const updateServices = (partial: Partial<Services>) => {
 
 export const getSchedules = () => schedules;
 export const updateSchedules = (partial: Partial<Schedules>) => {
-  schedules = mergeDeep(clone(schedules), partial) as Schedules;
+  const merged = mergeDeep(clone(schedules), partial) as Schedules;
+  // Like the real server, a day's temperature adjustments are replaced as a whole. A deep merge
+  // would keep times that the saved schedule no longer has.
+  (['left', 'right'] as const).forEach(side => {
+    Object.entries(partial[side] ?? {}).forEach(([day, daySchedule]) => {
+      if (daySchedule?.temperatures) merged[side][day as keyof Schedules['left']].temperatures = { ...daySchedule.temperatures };
+    });
+  });
+  schedules = merged;
   return schedules;
 };
 

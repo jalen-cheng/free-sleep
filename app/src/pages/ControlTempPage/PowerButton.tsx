@@ -11,6 +11,7 @@ import { useServices } from '@api/services.ts';
 import { Job, postJobs } from '@api/jobs.ts';
 import AnalyzeSleepNotification from './AnalyzeSleepNotification.tsx';
 import { useControlTempStore } from './controlTempStore.tsx';
+import { buildSidesPayload, getControlledSides } from '@lib/sides.ts';
 
 
 type PowerButtonProps = {
@@ -22,7 +23,7 @@ type PowerButtonProps = {
 }
 
 export default function PowerButton({ isOn, isStatusLoaded, refetch }: PowerButtonProps) {
-  const { isUpdating, setIsUpdating, side } = useAppStore();
+  const { isUpdating, setIsUpdating, side, linkSides } = useAppStore();
   const { data: settings } = useSettings();
   const { data: services } = useServices();
   const setDeviceStatus = useControlTempStore(state => state.setDeviceStatus);
@@ -32,11 +33,7 @@ export default function PowerButton({ isOn, isStatusLoaded, refetch }: PowerButt
   const [showAnalyzeNotification, setShowAnalyzeNotification] = useState(false);
 
   const handleOnClick = (powerOn: boolean) => {
-    const deviceStatus: DeepPartial<DeviceStatus> = {
-      [side]: {
-        isOn: powerOn
-      }
-    };
+    const deviceStatus: DeepPartial<DeviceStatus> = buildSidesPayload(getControlledSides(side, linkSides), { isOn: powerOn });
     if (powerOn) {
       setShowAnalyzeSleep(false);
     } else {

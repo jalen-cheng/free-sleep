@@ -7,7 +7,7 @@ type SaveButtonProps = {
 }
 
 export default function SaveButton({ onSave }: SaveButtonProps) {
-  const { isUpdating } = useAppStore();
+  const { isUpdating, linkSides } = useAppStore();
   const { changesPresent, isValid } = useScheduleStore();
   if (!changesPresent) return null;
 
@@ -15,7 +15,7 @@ export default function SaveButton({ onSave }: SaveButtonProps) {
 
   return (
     <Button variant="contained" onClick={ onSave } disabled={ isUpdating || !valid || !changesPresent }>
-      Save
+      { linkSides ? 'Save to both sides' : 'Save' }
     </Button>
   );
 }

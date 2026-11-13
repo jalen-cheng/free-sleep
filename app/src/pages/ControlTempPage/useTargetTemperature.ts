@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { postDeviceStatus } from '@api/deviceStatus.ts';
 import { useAppStore } from '@state/appStore.tsx';
 import { MAX_TEMP_F, MIN_TEMP_F } from '@lib/temperatureConversions.ts';
+import { buildSidesPayload, getControlledSides } from '@lib/sides.ts';
 import { useControlTempStore } from './controlTempStore.tsx';
 
 // How long to wait after the last +/- press before sending, so a run of presses is one request
@@ -12,12 +13,12 @@ const STATUS_SETTLE_MS = 1_500;
 
 const wait = (milliseconds: number) => new Promise(resolve => setTimeout(resolve, milliseconds));
 
-// Edits the selected side's target temperature.
+// Edits the selected side's target temperature, and the other side's too when the sides are linked.
 // Changes show on screen at once and are sent to the Pod separately, so the controls never
 // lock up while a request is in flight. While an edit is pending, the page does not overwrite
 // it with older values polled from the Pod (see `hasPendingEdit`).
 export function useTargetTemperature(refetch: () => Promise<unknown>) {
-  const { side } = useAppStore();
+  const { side, linkSides } = useAppStore();
   const setDeviceStatus = useControlTempStore(state => state.setDeviceStatus);
   const setHasPendingEdit = useControlTempStore(state => state.setHasPendingEdit);
   const commitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -31,9 +32,9 @@ export function useTargetTemperature(refetch: () => Promise<unknown>) {
     if (targetTemperatureF === currentTarget) return targetTemperatureF;
     editCount.current += 1;
     setHasPendingEdit(true);
-    setDeviceStatus({ [side]: { targetTemperatureF } });
+    setDeviceStatus(buildSidesPayload(getControlledSides(side, linkSides), { targetTemperatureF }));
     return targetTemperatureF;
-  }, [side, setDeviceStatus, setHasPendingEdit]);
+  }, [side, linkSides, setDeviceStatus, setHasPendingEdit]);
 
   // Sends the target shown on screen to the Pod, then reloads the Pod's state
   const commitTargetTemperature = useCallback(async () => {
@@ -43,7 +44,7 @@ export function useTargetTemperature(refetch: () => Promise<unknown>) {
     if (targetTemperatureF === undefined) return;
     const editCountAtCommit = editCount.current;
     try {
-      await postDeviceStatus({ [side]: { targetTemperatureF } });
+      await postDeviceStatus(buildSidesPayload(getControlledSides(side, linkSides), { targetTemperatureF }));
       await wait(STATUS_SETTLE_MS);
     } catch (error) {
       console.error(error);
@@ -53,7 +54,7 @@ export function useTargetTemperature(refetch: () => Promise<unknown>) {
     // Reload before releasing the edit, so the screen never falls back to the old value in between
     await refetch();
     if (editCount.current === editCountAtCommit) setHasPendingEdit(false);
-  }, [side, refetch, setHasPendingEdit]);
+  }, [side, linkSides, refetch, setHasPendingEdit]);
 
   // Moves the target by a number of °F and sends it once the presses stop
   const stepTargetTemperature = useCallback((changeF: number) => {

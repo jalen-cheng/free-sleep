@@ -14,9 +14,14 @@ type AppState = {
   setIsUpdating: (isUpdating: boolean) => void;
   side: Side;
   setSide: (side: Side) => void;
+  // When true, temperature, power and schedule changes apply to both sides.
+  // Remembered per browser, like the selected side.
+  linkSides: boolean;
+  setLinkSides: (linkSides: boolean) => void;
 };
 
 const SIDE_KEY = 'side';
+const LINK_SIDES_KEY = 'link_sides';
 export const USER_ID_KEY = 'user_id';
 export const HUB_VERSION_KEY = 'pod_version';
 export const COVER_VERSION_KEY = 'cover_version';
@@ -29,6 +34,11 @@ export const useAppStore = create<AppState>((set) => ({
   setSide: (side: Side) => {
     set({ side });
     localStorage.setItem(SIDE_KEY, side);
+  },
+  linkSides: localStorage.getItem(LINK_SIDES_KEY) === 'true',
+  setLinkSides: (linkSides: boolean) => {
+    set({ linkSides });
+    localStorage.setItem(LINK_SIDES_KEY, String(linkSides));
   },
 }));
 
