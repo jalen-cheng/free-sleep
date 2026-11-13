@@ -2,7 +2,9 @@
 # Blocks WAN access for the Pod, keeps LAN + NTP working, and makes the block survive reboots.
 #
 # Options (environment variables, remembered for later runs such as the re-block after an update):
-#   ALLOW_SENTRY=true   Allow error logs to reach Sentry's ingestion servers (default: blocked)
+#   ALLOW_SENTRY=true      Allow error logs to reach Sentry's ingestion servers (default: blocked)
+#   ALLOW_TAILSCALE=true   Allow the Tailscale address range, for remote access through a
+#                          tailnet (default: blocked)
 #
 # Usage:
 #   sh block_internet_access.sh                 Apply, save and persist the rules
@@ -18,11 +20,17 @@ if [ "${1:-}" = "--print-rules" ]; then
 fi
 
 ALLOW_SENTRY=$(resolve_firewall_option ALLOW_SENTRY false)
+ALLOW_TAILSCALE=$(resolve_firewall_option ALLOW_TAILSCALE false)
 
 # https://docs.sentry.io/security-legal-pii/security/ip-ranges/#event-ingestion
 SENTRY_INGESTION_IPS="35.186.247.156 34.120.195.249 34.36.122.224 34.36.87.148 34.120.62.213 130.211.36.74"
 PRIVATE_IPV4_RANGES="10.0.0.0/8 172.16.0.0/12 192.168.0.0/16"
 PRIVATE_IPV6_RANGES="fe80::/10 fd00::/8"
+# Tailscale's CGNAT range. Its IPv6 range (fd7a:115c:a1e0::/48) is already inside fd00::/8.
+TAILSCALE_IPV4_RANGE="100.64.0.0/10"
+if [ "$ALLOW_TAILSCALE" = "true" ]; then
+  PRIVATE_IPV4_RANGES="$PRIVATE_IPV4_RANGES $TAILSCALE_IPV4_RANGE"
+fi
 
 # Prints the IPv4 ruleset in iptables-restore format. Loading it replaces the whole filter table
 # in one step, so re-running this script never duplicates rules or leaves a half-open window.
@@ -88,6 +96,10 @@ else
   echo "Sentry servers are blocked. To allow error logs, run: 'ALLOW_SENTRY=true sh scripts/block_internet_access.sh'"
 fi
 
+if [ "$ALLOW_TAILSCALE" = "true" ]; then
+  echo "Tailscale range $TAILSCALE_IPV4_RANGE is allowed (ALLOW_TAILSCALE=true)."
+fi
+
 echo "Updating the timesyncd config"
 cat > "$TIMESYNCD_CONFIG" <<EOF
 [Time]
@@ -111,6 +123,7 @@ build_ipv6_rules > "$FIREWALL_RULES_V6"
 ip6tables-restore < "$FIREWALL_RULES_V6"
 
 save_firewall_option ALLOW_SENTRY "$ALLOW_SENTRY"
+save_firewall_option ALLOW_TAILSCALE "$ALLOW_TAILSCALE"
 
 # Restore the rules on every boot
 sh "$SCRIPT_DIR/setup_firewall_service.sh"

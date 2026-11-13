@@ -275,6 +275,10 @@ sh /home/dac/free-sleep/scripts/block_internet_access.sh
 - Running the script again is safe; it replaces the existing rules instead of adding duplicates.
 - Sentry (error logging) servers are **blocked** by default. If you want to send error logs, allow them with
   `ALLOW_SENTRY=true sh /home/dac/free-sleep/scripts/block_internet_access.sh` (logs are still only sent if you enable error logging in the UI). The choice is remembered across updates.
+- Remote access over Tailscale: `ALLOW_TAILSCALE=true sh /home/dac/free-sleep/scripts/block_internet_access.sh` also allows `100.64.0.0/10`.
+  This only opens the tailnet address range. It is meant for reaching the Pod through a Tailscale subnet router elsewhere on your LAN
+  that forwards tailnet source addresses (`--snat-subnet-routes=false`); with the default subnet router settings traffic already arrives from a LAN address and you don't need it.
+  Running Tailscale on the Pod itself would need internet access to Tailscale's coordination and relay servers, which this firewall blocks.
 - Preview the rules without changing anything: `sh /home/dac/free-sleep/scripts/block_internet_access.sh --print-rules`
 
 Verify after a reboot:
@@ -287,6 +291,17 @@ ping -c1 8.8.8.8                  # should fail
 Undo it (removes the saved rules and stops them from being restored on boot):
 ```
 sh /home/dac/free-sleep/scripts/unblock_internet_access.sh
+```
+
+### Extra updater lockout (optional)
+Step 11 already disables Eight Sleep's updater. This script re-applies the mask for the updater services that exist on your Pod and
+adds `/etc/hosts` entries that send Eight Sleep's cloud hosts (`raw-api-upload.8slp.net`, `update-api.8slp.net`, `device-api.8slp.net`) nowhere,
+so they stay unreachable even while the firewall is briefly opened for a Free Sleep update.
+```
+sh /home/dac/free-sleep/scripts/updater_lockout.sh enable
+
+# You can undo this with
+sh /home/dac/free-sleep/scripts/updater_lockout.sh disable
 ```
 
 #### Free sleep commands available (run this in the terminal through an SSH session on your pod)

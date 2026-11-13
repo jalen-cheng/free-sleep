@@ -37,6 +37,7 @@ class FirewallScriptTests(unittest.TestCase):
                                 FIREWALL_CONFIG=str(self.config), SYSTEMD_UNIT_DIR=str(self.units),
                                 TIMESYNCD_CONFIG=str(self.folder / 'timesyncd.conf'))
         self.environment.pop('ALLOW_SENTRY', None)
+        self.environment.pop('ALLOW_TAILSCALE', None)
 
     def run_script(self, name, *arguments, **extra_environment):
         return subprocess.run(['sh', str(scripts_path / name), *arguments], check=True, text=True,
@@ -70,6 +71,38 @@ class FirewallScriptTests(unittest.TestCase):
         self.assertIn(sentry_rule, self.read_rules())
         self.run_script('block_internet_access.sh', ALLOW_SENTRY='false')
         self.assertNotIn(sentry_rule, self.read_rules())
+
+    def test_tailscale_range_is_opt_in(self):
+        tailscale_rule = '-A OUTPUT -d 100.64.0.0/10 -j ACCEPT'
+        self.run_script('block_internet_access.sh')
+        self.assertNotIn(tailscale_rule, self.read_rules())
+        self.run_script('block_internet_access.sh', ALLOW_TAILSCALE='true')
+        self.assertIn(tailscale_rule, self.read_rules())
+        self.assertLess(self.read_rules().index(tailscale_rule), self.read_rules().index('-A OUTPUT -j DROP'))
+
+    def test_updater_lockout_skips_missing_units_and_is_reversible(self):
+        hosts = self.folder / 'hosts'
+        hosts.write_text('127.0.0.1 localhost\n')
+        systemctl = self.commands / 'systemctl'
+        # Only swupdate.service exists on this fake Pod
+        systemctl.write_text('''#!/bin/sh
+printf 'systemctl %s\\n' "$*" >> "$FIREWALL_LOG"
+if [ "$1" = "list-unit-files" ] && [ "$2" = "swupdate.service" ]; then
+  echo "swupdate.service enabled"
+fi
+''')
+        result = self.run_script('updater_lockout.sh', 'enable', HOSTS_FILE=str(hosts))
+        self.run_script('updater_lockout.sh', 'enable', HOSTS_FILE=str(hosts))
+        log = self.log.read_text()
+        self.assertIn('systemctl mask --now swupdate.service', log)
+        self.assertNotIn('mask --now defibrillator.service', log)
+        self.assertIn("unit 'defibrillator.service' not found", result.stderr)
+        self.assertEqual(hosts.read_text().count('update-api.8slp.net'), 1)
+        self.assertIn('0.0.0.0 raw-api-upload.8slp.net', hosts.read_text())
+
+        self.run_script('updater_lockout.sh', 'disable', HOSTS_FILE=str(hosts))
+        self.assertIn('systemctl unmask swupdate.service', self.log.read_text())
+        self.assertEqual(hosts.read_text(), '127.0.0.1 localhost\n')
 
     def test_print_rules_changes_nothing(self):
         result = self.run_script('block_internet_access.sh', '--print-rules')
