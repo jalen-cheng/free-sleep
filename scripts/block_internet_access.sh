@@ -1,60 +1,95 @@
 #!/bin/bash
+# Blocks WAN access for the Pod, keeps LAN + NTP working, and makes the block survive reboots.
+#
+# Options (environment variables, remembered for later runs such as the re-block after an update):
+#   ALLOW_SENTRY=true   Allow error logs to reach Sentry's ingestion servers (default: blocked)
+#
+# Usage:
+#   sh block_internet_access.sh                 Apply, save and persist the rules
+#   sh block_internet_access.sh --print-rules   Only print the rules that would be applied
+set -eu
 
-echo "Blocking internet access..."
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+. "$SCRIPT_DIR/firewall_common.sh"
 
-# IPv4 Rules
-echo "Configuring IPv4 rules..."
-
-# -----------------------------------------------------------------------------------------------------
-# Allow traffic to Sentry servers for error logging
-
-# https://docs.sentry.io/security-legal-pii/security/ip-ranges/#event-ingestion
-
-# Check if ALLOW_SENTRY is true
-if [ "$ALLOW_SENTRY" = "false" ]; then
-  echo "ALLOW_SENTRY is not true — skipping Sentry firewall configuration."
-
-else
-  echo -e "\e[33mIP rules were setup to allow error logs to be sent to Sentry servers\e[0m"
-  echo -e "\e[33mSentry error logs will NOT be sent to Sentry unless error logging is explicitly enabled in the UI. (It's off by default)\e[0m"
-  echo -e "\e[33mIf you'd like to block Sentry servers, run: 'ALLOW_SENTRY=false sh scripts/block_internet_access.sh'\e[0m"
-  echo -e "\e[33m\e[0m"
-  # --- US IPs ---
-  iptables -C INPUT  -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || \
-  iptables -I INPUT  -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
-  iptables -C OUTPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || \
-  iptables -I OUTPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
-
-  iptables -A OUTPUT -d 35.186.247.156 -j ACCEPT
-  iptables -A OUTPUT -d 34.120.195.249 -j ACCEPT
-  iptables -A OUTPUT -d 34.36.122.224  -j ACCEPT
-  iptables -A OUTPUT -d 34.36.87.148 -j ACCEPT
-  iptables -A OUTPUT -d 34.120.62.213 -j ACCEPT
-  iptables -A OUTPUT -d 130.211.36.74 -j ACCEPT
-  echo "Sentry error logging IP rules applied successfully."
+PRINT_RULES_ONLY=false
+if [ "${1:-}" = "--print-rules" ]; then
+  PRINT_RULES_ONLY=true
 fi
 
-# -----------------------------------------------------------------------------------------------------
+ALLOW_SENTRY=$(resolve_firewall_option ALLOW_SENTRY false)
 
-# Allow LAN traffic Class A (10.0.0.0/8)
-iptables -A INPUT -s 10.0.0.0/8 -j ACCEPT
-iptables -A OUTPUT -d 10.0.0.0/8 -j ACCEPT
+# https://docs.sentry.io/security-legal-pii/security/ip-ranges/#event-ingestion
+SENTRY_INGESTION_IPS="35.186.247.156 34.120.195.249 34.36.122.224 34.36.87.148 34.120.62.213 130.211.36.74"
+PRIVATE_IPV4_RANGES="10.0.0.0/8 172.16.0.0/12 192.168.0.0/16"
+PRIVATE_IPV6_RANGES="fe80::/10 fd00::/8"
 
-# Allow LAN traffic Class B (172.16.0.0/12)
-iptables -A INPUT -s 172.16.0.0/12 -j ACCEPT
-iptables -A OUTPUT -d 172.16.0.0/12 -j ACCEPT
+# Prints the IPv4 ruleset in iptables-restore format. Loading it replaces the whole filter table
+# in one step, so re-running this script never duplicates rules or leaves a half-open window.
+build_ipv4_rules() {
+  echo "*filter"
+  echo ":INPUT ACCEPT [0:0]"
+  echo ":FORWARD ACCEPT [0:0]"
+  echo ":OUTPUT ACCEPT [0:0]"
+  # NTP keeps the system clock (and therefore schedules) correct
+  echo "-A INPUT -p udp --sport 123 -j ACCEPT"
+  echo "-A OUTPUT -p udp --dport 123 -j ACCEPT"
+  # Loopback lets local services talk to each other
+  echo "-A INPUT -i lo -j ACCEPT"
+  echo "-A OUTPUT -o lo -j ACCEPT"
+  for private_range in $PRIVATE_IPV4_RANGES; do
+    echo "-A INPUT -s $private_range -j ACCEPT"
+    echo "-A OUTPUT -d $private_range -j ACCEPT"
+  done
+  if [ "$ALLOW_SENTRY" = "true" ]; then
+    echo "-A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT"
+    for sentry_ip in $SENTRY_INGESTION_IPS; do
+      echo "-A OUTPUT -d $sentry_ip -j ACCEPT"
+    done
+  fi
+  echo "-A INPUT -j DROP"
+  echo "-A OUTPUT -j DROP"
+  echo "COMMIT"
+}
 
-# Allow LAN traffic Class C (192.168.0.0/16)
-iptables -A INPUT -s 192.168.0.0/16 -j ACCEPT
-iptables -A OUTPUT -d 192.168.0.0/16 -j ACCEPT
+# Prints the IPv6 ruleset in ip6tables-restore format.
+build_ipv6_rules() {
+  echo "*filter"
+  echo ":INPUT ACCEPT [0:0]"
+  echo ":FORWARD ACCEPT [0:0]"
+  echo ":OUTPUT ACCEPT [0:0]"
+  echo "-A INPUT -p udp --sport 123 -j ACCEPT"
+  echo "-A OUTPUT -p udp --dport 123 -j ACCEPT"
+  echo "-A INPUT -i lo -j ACCEPT"
+  echo "-A OUTPUT -o lo -j ACCEPT"
+  for private_range in $PRIVATE_IPV6_RANGES; do
+    echo "-A INPUT -s $private_range -j ACCEPT"
+    echo "-A OUTPUT -d $private_range -j ACCEPT"
+  done
+  echo "-A INPUT -j DROP"
+  echo "-A OUTPUT -j DROP"
+  echo "COMMIT"
+}
 
-# Allow NTP traffic - this allows us to synchronize the system time
-iptables -I OUTPUT -p udp --dport 123 -j ACCEPT
-iptables -I INPUT -p udp --sport 123 -j ACCEPT
+if [ "$PRINT_RULES_ONLY" = "true" ]; then
+  echo "# IPv4"
+  build_ipv4_rules
+  echo "# IPv6"
+  build_ipv6_rules
+  exit 0
+fi
+
+echo "Blocking internet access..."
+if [ "$ALLOW_SENTRY" = "true" ]; then
+  printf '\033[33m%s\033[0m\n' "Sentry servers are allowed (ALLOW_SENTRY=true)."
+  printf '\033[33m%s\033[0m\n' "Error logs are only sent if error logging is enabled in the UI (off by default)."
+  printf '\033[33m%s\033[0m\n' "To block Sentry again, run: 'ALLOW_SENTRY=false sh scripts/block_internet_access.sh'"
+else
+  echo "Sentry servers are blocked. To allow error logs, run: 'ALLOW_SENTRY=true sh scripts/block_internet_access.sh'"
+fi
 
 echo "Updating the timesyncd config"
-# New configuration content
-cat > /etc/systemd/timesyncd.conf <<EOF
+cat > "$TIMESYNCD_CONFIG" <<EOF
 [Time]
 NTP=pool.ntp.org 0.pool.ntp.org 1.pool.ntp.org 2.pool.ntp.org 3.pool.ntp.org
 FallbackNTP=time1.google.com time2.google.com time3.google.com time4.google.com
@@ -62,37 +97,22 @@ RootDistanceMaxSec=5
 PollIntervalMinSec=32
 PollIntervalMaxSec=2048
 EOF
+systemctl restart systemd-timesyncd || echo "WARNING: Unable to restart systemd-timesyncd" >&2
 
-# Restart timesyncd to apply changes
-systemctl restart systemd-timesyncd
-
-
-# Allow localhost (loopback) traffic so local apps can talk to each other
-iptables -A INPUT  -i lo -j ACCEPT
-iptables -A OUTPUT -o lo -j ACCEPT
-
-# Block everything else
-iptables -A INPUT -j DROP
-iptables -A OUTPUT -j DROP
-
-# Save rules
-iptables-save > /etc/iptables/iptables.rules
+# Write the rules files first and load the live rules from them, so what runs now is
+# exactly what gets restored at boot.
+mkdir -p "$FIREWALL_RULES_DIR"
+echo "Configuring IPv4 rules..."
+build_ipv4_rules > "$FIREWALL_RULES_V4"
+iptables-restore < "$FIREWALL_RULES_V4"
 
 echo "Configuring IPv6 rules..."
-# Allow local traffic for IPv6
-ip6tables -A INPUT -s fe80::/10 -j ACCEPT
-ip6tables -A OUTPUT -d fe80::/10 -j ACCEPT
-ip6tables -A INPUT -s fd00::/8 -j ACCEPT
-ip6tables -A OUTPUT -d fd00::/8 -j ACCEPT
+build_ipv6_rules > "$FIREWALL_RULES_V6"
+ip6tables-restore < "$FIREWALL_RULES_V6"
 
-# Allow NTP traffic (IPv6)
-ip6tables -I OUTPUT -p udp --dport 123 -j ACCEPT
-ip6tables -I INPUT -p udp --sport 123 -j ACCEPT
+save_firewall_option ALLOW_SENTRY "$ALLOW_SENTRY"
 
-# Block everything else (IPv6)
-ip6tables -A INPUT -j DROP
-ip6tables -A OUTPUT -j DROP
-ip6tables-save > /etc/iptables/ip6tables.rules
+# Restore the rules on every boot
+sh "$SCRIPT_DIR/setup_firewall_service.sh"
 
 echo "Blocked WAN internet access successfully!"
-

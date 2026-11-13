@@ -45,8 +45,8 @@ fi
 
 systemctl disable free-sleep
 
-# Unblock internet first
-sh /home/dac/free-sleep/scripts/unblock_internet_access.sh
+# Unblock internet first. Temporary: the saved rules stay, so a reboot mid-update comes back blocked.
+sh /home/dac/free-sleep/scripts/unblock_internet_access.sh --temporary
 
 # If a free-sleep folder exists, back it up
 if [ -d /home/dac/free-sleep ]; then
@@ -73,7 +73,7 @@ fi
 systemctl enable free-sleep || true
 systemctl start free-sleep || true
 
-# Block internet access again
+# Block internet access again. Options chosen earlier (e.g. ALLOW_SENTRY) are read from the saved config.
 sh /home/dac/free-sleep/scripts/block_internet_access.sh
 if [ "$update_succeeded" != true ]; then
   echo "Update failed; the previous installation was restored." >&2

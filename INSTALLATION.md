@@ -262,11 +262,26 @@ sh /home/dac/free-sleep/scripts/setup_ssh.sh
 ## 19. Add firewall rules to block access to the internet (optional, but recommended)
 ```
 sh /home/dac/free-sleep/scripts/block_internet_access.sh
-
-# You can undo this with 
-sh /home/dac/free-sleep/scripts/unblock_internet_access.sh
 ```
 
+- Blocks all traffic leaving your local network. LAN access (the Free Sleep site, SSH) and NTP time sync keep working.
+- The rules are saved and restored on every boot by the `free-sleep-firewall` systemd service, and are re-applied after Free Sleep updates.
+- Running the script again is safe; it replaces the existing rules instead of adding duplicates.
+- Sentry (error logging) servers are **blocked** by default. If you want to send error logs, allow them with
+  `ALLOW_SENTRY=true sh /home/dac/free-sleep/scripts/block_internet_access.sh` (logs are still only sent if you enable error logging in the UI). The choice is remembered across updates.
+- Preview the rules without changing anything: `sh /home/dac/free-sleep/scripts/block_internet_access.sh --print-rules`
+
+Verify after a reboot:
+```
+systemctl status free-sleep-firewall --no-pager
+iptables -L OUTPUT -n | tail -3   # last rule should be DROP
+ping -c1 8.8.8.8                  # should fail
+```
+
+Undo it (removes the saved rules and stops them from being restored on boot):
+```
+sh /home/dac/free-sleep/scripts/unblock_internet_access.sh
+```
 
 #### Free sleep commands available (run this in the terminal through an SSH session on your pod)
 - `fs-debug` - Prints a debug report  for the pod & free sleep
