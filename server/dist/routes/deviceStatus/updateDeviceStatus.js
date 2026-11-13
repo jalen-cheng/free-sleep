@@ -1,11 +1,11 @@
 
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="f6af1dba-89d4-5dd5-90f4-f85e211c7ebc")}catch(e){}}();
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="5712b5f2-fa35-5cf4-9d3d-526472352383")}catch(e){}}();
 import _ from 'lodash';
 import cbor from 'cbor';
 import { executeFunction } from '../../8sleep/deviceApi.js';
 import logger from '../../logger.js';
 import settingsDB from '../../db/settings.js';
-import memoryDB from '../../db/memoryDB.js';
+import { alarmSession } from '../../jobs/alarmScheduler.js';
 import { INVERTED_SETTINGS_KEY_MAPPING } from '../../8sleep/loadDeviceStatus.js';
 const calculateLevelFromF = (temperatureF) => {
     const level = (temperatureF - 82.5) / 27.5 * 100;
@@ -52,13 +52,21 @@ const updateSide = async (side, sideStatus) => {
         if (updateRight)
             await executeFunction('RIGHT_TEMP_DURATION', seconds);
     }
+    // A pending snooze must not re-start the alarm on a side that was just turned off
+    if (isOn === false) {
+        if (updateLeft)
+            alarmSession.cancelSnooze('left');
+        if (updateRight)
+            alarmSession.cancelSnooze('right');
+    }
     if (isAlarmVibrating !== undefined) {
         logger.debug('Can only set isAlarmVibrating to false for now...');
-        if (!isAlarmVibrating)
+        if (!isAlarmVibrating) {
+            // ALARM_CLEAR takes no side, it may stop the alarm on both sides
+            logger.debug(`Clearing alarm, requested by ${side} side`);
             await executeFunction('ALARM_CLEAR', 'empty');
-        await memoryDB.read();
-        memoryDB.data[side].isAlarmVibrating = false;
-        await memoryDB.write();
+        }
+        await alarmSession.alarmCleared(side);
     }
 };
 const updateSettings = async (settings) => {
@@ -80,4 +88,4 @@ export const updateDeviceStatus = async (deviceStatus) => {
     logger.info('Finished updating device status');
 };
 //# sourceMappingURL=updateDeviceStatus.js.map
-//# debugId=f6af1dba-89d4-5dd5-90f4-f85e211c7ebc
+//# debugId=5712b5f2-fa35-5cf4-9d3d-526472352383

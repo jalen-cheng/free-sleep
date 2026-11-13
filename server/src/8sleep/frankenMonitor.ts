@@ -13,6 +13,8 @@ import { Side } from '../db/schedulesSchema.js';
 import { GestureSchema } from '../db/settingsSchema.js';
 import { countNewGestures, processSideGestures } from './gestures.js';
 import config from '../config.js';
+import { handleAlarmGesture } from '../jobs/alarmSession.js';
+import { alarmSession } from '../jobs/alarmScheduler.js';
 import { updateDeviceStatus } from '../routes/deviceStatus/updateDeviceStatus.js';
 import { DeepPartial } from 'ts-essentials';
 import serverStatus from '../serverStatus.js';
@@ -66,9 +68,16 @@ export class FrankenMonitor {
             logger.debug(`Processing gesture temperature change for ${side} -> ${temperatureF}`);
             await updateDeviceStatus({ [side]: { targetTemperatureF: temperatureF } } as DeepPartial<DeviceStatus>);
           },
-          runAlarmGesture: async () => {
-            // TODO: Add alarm handling
-            logger.warn('Skipping gesture...');
+          runAlarmGesture: async (tapConfig) => {
+            const result = await handleAlarmGesture(tapConfig, {
+              isAlarmVibrating: nextDeviceStatus[side].isAlarmVibrating,
+              isSideOn: nextDeviceStatus[side].isOn,
+              // Same paths the app uses to dismiss an alarm and for its power button
+              dismissAlarm: () => updateDeviceStatus({ [side]: { isAlarmVibrating: false } } as DeepPartial<DeviceStatus>),
+              snoozeAlarm: snoozeSeconds => alarmSession.snooze(side, snoozeSeconds),
+              setPower: isOn => updateDeviceStatus({ [side]: { isOn } } as DeepPartial<DeviceStatus>),
+            });
+            logger.debug(`Processed alarm gesture for ${side}: ${result}`);
           },
         },
       });

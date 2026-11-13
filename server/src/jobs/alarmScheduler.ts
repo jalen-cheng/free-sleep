@@ -12,6 +12,7 @@ import { executeFunction } from '../8sleep/deviceApi.js';
 import { getDayIndexForSchedule, logJob } from './utils.js';
 import { connectFranken } from '../8sleep/frankenServer.js';
 import { Settings } from '../db/settingsSchema.js';
+import { createAlarmSession } from './alarmSession.js';
 
 
 export const executeAlarm = async ({ vibrationIntensity, duration, vibrationPattern, side, force=false }: AlarmJob) => {
@@ -50,19 +51,8 @@ export const executeAlarm = async ({ vibrationIntensity, duration, vibrationPatt
 
     logger.debug(`Executing alarm... ${JSON.stringify(alarmPayload)}`);
     await executeFunction(command, hexPayload);
-    await memoryDB.read();
-    memoryDB.data[side].isAlarmVibrating = true;
-    await memoryDB.write();
-
-    setTimeout(
-      async () => {
-        logger.debug('');
-        await memoryDB.read();
-        memoryDB.data[side].isAlarmVibrating = false;
-        await memoryDB.write();
-      },
-      min10Duration * 1_000
-    );
+    // eslint-disable-next-line no-use-before-define
+    await alarmSession.alarmStarted({ vibrationIntensity, duration, vibrationPattern, side, force }, min10Duration);
     serverStatus.status.alarmSchedule.status = 'healthy';
     serverStatus.status.alarmSchedule.message = '';
   } catch (error: unknown) {
@@ -72,6 +62,18 @@ export const executeAlarm = async ({ vibrationIntensity, duration, vibrationPatt
     logger.error(error);
   }
 };
+
+
+// Owns the per-side alarm timers (end of vibration, snooze). A snoozed alarm re-runs executeAlarm.
+export const alarmSession = createAlarmSession({
+  startAlarm: executeAlarm,
+  setAlarmVibrating: async (side, isAlarmVibrating) => {
+    await memoryDB.read();
+    memoryDB.data[side].isAlarmVibrating = isAlarmVibrating;
+    await memoryDB.write();
+  },
+  logDebug: message => logger.debug(message),
+});
 
 
 /**
