@@ -1,5 +1,5 @@
 
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="8bd57111-2ce7-58e0-acf8-513bf1c791cb")}catch(e){}}();
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="c1a1a13f-c388-59b4-8de1-f801c55c7179")}catch(e){}}();
 import { once } from 'events';
 import binarySplit from 'binary-split';
 export class MessageReadTimeoutError extends Error {
@@ -46,6 +46,10 @@ export class MessageStream {
                 clearTimeout(timeout);
         }
     }
+    // Removes and returns messages that arrived while nothing was waiting for a response.
+    takeQueuedMessages() {
+        return this.queue.splice(0, this.queue.length);
+    }
     async readMessage(timeoutMs) {
         // eslint-disable-next-line no-constant-condition
         while (true) {
@@ -65,4 +69,4 @@ export class MessageStream {
     }
 }
 //# sourceMappingURL=messageStream.js.map
-//# debugId=8bd57111-2ce7-58e0-acf8-513bf1c791cb
+//# debugId=c1a1a13f-c388-59b4-8de1-f801c55c7179

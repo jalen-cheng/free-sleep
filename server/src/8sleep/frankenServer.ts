@@ -34,6 +34,7 @@ class FrankenConnectionFailedError extends Error {
 
 export class Franken {
   private static readonly responseDelayMs = 10;
+  private static readonly unsolicitedPreviewLength = 300;
 
   public constructor(
     private readonly socket: Socket,
@@ -44,11 +45,23 @@ export class Franken {
 
   static readonly separator = Buffer.from('\n\n');
 
-  public async sendMessage(message: string) {
-    logger.debug(`Sending message to sock | message: ${message}`);
+  // Frank only speaks when spoken to, as far as we know. Anything already queued before a request
+  // goes out was not asked for: log it (it may be a pushed event such as a tap) and drop it so it
+  // is not mistaken for the response to this request.
+  private logUnsolicitedMessages() {
+    for (const unsolicitedMessage of this.messageStream.takeQueuedMessages()) {
+      const preview = unsolicitedMessage.toString().slice(0, Franken.unsolicitedPreviewLength);
+      logger.debug(`Unsolicited message from Franken (${unsolicitedMessage.length} bytes): ${JSON.stringify(preview)}`);
+    }
+  }
+
+  // quiet skips the per-message debug logs, for high-rate polling that would flood the log file
+  public async sendMessage(message: string, quiet = false) {
+    if (!quiet) logger.debug(`Sending message to sock | message: ${message}`);
     let responseBytes: Buffer;
     try {
       responseBytes = await this.sequentialQueue.exec(async () => {
+        this.logUnsolicitedMessages();
         const requestBytes = Buffer.concat([Buffer.from(message), Franken.separator]);
         await this.write(requestBytes);
         const resp = await this.messageStream.readMessage(FRANKEN_RESPONSE_TIMEOUT_MS);
@@ -66,7 +79,7 @@ export class Franken {
       throw error;
     }
     const response = responseBytes.toString();
-    logger.debug(`Message sent successfully to sock | message: ${message}`);
+    if (!quiet) logger.debug(`Message sent successfully to sock | message: ${message}`);
 
     return response;
   }
@@ -86,10 +99,10 @@ export class Franken {
     await this.sendMessage(`${commandNumber}\n${cleanedArg}`);
   }
 
-  public async getDeviceStatus(getGestures=false): Promise<DeviceStatus> {
+  public async getDeviceStatus(getGestures=false, quiet=false): Promise<DeviceStatus> {
     const command: FrankenCommand = 'DEVICE_STATUS';
     const commandNumber = frankenCommands[command];
-    const response = await this.sendMessage(commandNumber);
+    const response = await this.sendMessage(commandNumber, quiet);
     return await loadDeviceStatus(response, getGestures);
   }
 

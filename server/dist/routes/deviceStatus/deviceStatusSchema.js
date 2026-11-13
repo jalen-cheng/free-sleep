@@ -1,13 +1,15 @@
 // WARNING! - Any changes here MUST be the same between app/src/api & server/src/db/
 
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="97b23902-cbac-52f6-9514-cd7b161195f4")}catch(e){}}();
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="7b512ee8-1d7a-5769-a26e-0914fd2bd0fb")}catch(e){}}();
 import { z } from 'zod';
+export const MIN_TARGET_TEMPERATURE_F = 55;
+export const MAX_TARGET_TEMPERATURE_F = 110;
 const SideStatusSchema = z.object({
     currentTemperatureLevel: z.number(),
     currentTemperatureF: z.number(),
     targetTemperatureF: z.number()
-        .min(55, { message: 'Temperature must be at least 55°F' })
-        .max(110, { message: 'Temperature cannot exceed 110°F' }),
+        .min(MIN_TARGET_TEMPERATURE_F, { message: `Temperature must be at least ${MIN_TARGET_TEMPERATURE_F}°F` })
+        .max(MAX_TARGET_TEMPERATURE_F, { message: `Temperature cannot exceed ${MAX_TARGET_TEMPERATURE_F}°F` }),
     secondsRemaining: z.number(),
     isOn: z.boolean(),
     isAlarmVibrating: z.boolean(),
@@ -44,4 +46,4 @@ export var Version;
     Version["Pod5"] = "Pod 5";
 })(Version || (Version = {}));
 //# sourceMappingURL=deviceStatusSchema.js.map
-//# debugId=97b23902-cbac-52f6-9514-cd7b161195f4
+//# debugId=7b512ee8-1d7a-5769-a26e-0914fd2bd0fb

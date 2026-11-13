@@ -3,14 +3,25 @@ import logger from '../logger.js';
 import settingsDB from '../db/settings.js';
 import { connectFranken } from './frankenServer.js';
 import { wait } from './promises.js';
-import { DeviceStatus, Version } from '../routes/deviceStatus/deviceStatusSchema.js';
+import {
+  DeviceStatus,
+  MAX_TARGET_TEMPERATURE_F,
+  MIN_TARGET_TEMPERATURE_F,
+  Version,
+} from '../routes/deviceStatus/deviceStatusSchema.js';
 import { Side } from '../db/schedulesSchema.js';
-import { Gesture, GestureSchema } from '../db/settingsSchema.js';
+import { GestureSchema } from '../db/settingsSchema.js';
+import { countNewGestures, processSideGestures } from './gestures.js';
+import config from '../config.js';
 import { updateDeviceStatus } from '../routes/deviceStatus/updateDeviceStatus.js';
 import { DeepPartial } from 'ts-essentials';
 import serverStatus from '../serverStatus.js';
 
-
+const SIDES: Side[] = ['left', 'right'];
+// Pods without tap support only need an occasional status refresh
+const STATUS_POLL_INTERVAL_MS = 60_000;
+// Keep the old 2s pause after a failed poll so a broken socket is not hammered at the gesture rate
+const RETRY_WAIT_MS = 2_000;
 
 export class FrankenMonitor {
   private isRunning: boolean;
@@ -41,35 +52,36 @@ export class FrankenMonitor {
     this.isRunning = false;
   }
 
-  private async processGesture(side: Side, gesture: Gesture) {
-    const behavior = settingsDB.data[side].taps[gesture];
-    if (behavior.type === 'temperature') {
-      const currentTemperatureTarget = this.deviceStatus![side].targetTemperatureF;
-      let newTemperatureTargetF;
-      const change = behavior.amount;
-      if (behavior.change === 'increment') {
-        newTemperatureTargetF = currentTemperatureTarget + change;
-      } else {
-        newTemperatureTargetF = currentTemperatureTarget + (-1 * change);
-      }
-      logger.debug(`Processing gesture temperature change for ${side}. ${currentTemperatureTarget} -> ${newTemperatureTargetF}`);
-      return await updateDeviceStatus({ [side]: { targetTemperatureF: newTemperatureTargetF } } as DeepPartial<DeviceStatus>);
-    } else if (behavior.type) {
-      // TODO: Add alarm handling
-      logger.warn('Skipping gesture...');
-    }
-  }
-
-  private processGesturesForSide(nextDeviceStatus: DeviceStatus, side: Side) {
+  // Runs the configured actions for every tap gesture a side made since the last poll.
+  private async processGesturesForSide(nextDeviceStatus: DeviceStatus, side: Side) {
     try {
-      for (const gesture of GestureSchema.options) {
-        if (nextDeviceStatus[side].taps?.[gesture] !== this?.deviceStatus?.[side].taps?.[gesture]) {
-          this.processGesture(side, gesture);
-        }
-      }
+      await processSideGestures({
+        previousTaps: this.deviceStatus?.[side].taps,
+        nextTaps: nextDeviceStatus[side].taps,
+        tapSettings: settingsDB.data[side].taps,
+        targetTemperatureF: nextDeviceStatus[side].targetTemperatureF,
+        temperatureLimits: { minTemperatureF: MIN_TARGET_TEMPERATURE_F, maxTemperatureF: MAX_TARGET_TEMPERATURE_F },
+        actions: {
+          setTargetTemperature: async (temperatureF) => {
+            logger.debug(`Processing gesture temperature change for ${side} -> ${temperatureF}`);
+            await updateDeviceStatus({ [side]: { targetTemperatureF: temperatureF } } as DeepPartial<DeviceStatus>);
+          },
+          runAlarmGesture: async () => {
+            // TODO: Add alarm handling
+            logger.warn('Skipping gesture...');
+          },
+        },
+      });
     } catch (error) {
       logger.error(error);
     }
+  }
+
+  // True when any tap counter moved forward, so settings are only read from disk when needed.
+  private hasNewGestures(nextDeviceStatus: DeviceStatus) {
+    return SIDES.some(side => GestureSchema.options.some(gesture => (
+      countNewGestures(this.deviceStatus?.[side].taps?.[gesture], nextDeviceStatus[side].taps?.[gesture]) > 0
+    )));
   }
 
   private async processGestures(nextDeviceStatus: DeviceStatus) {
@@ -77,9 +89,12 @@ export class FrankenMonitor {
       logger.warn('Missing current deviceStatus, exiting...');
       return;
     }
+    if (!this.hasNewGestures(nextDeviceStatus)) return;
 
-    this.processGesturesForSide(nextDeviceStatus, 'left');
-    this.processGesturesForSide(nextDeviceStatus, 'right');
+    await settingsDB.read();
+    for (const side of SIDES) {
+      await this.processGesturesForSide(nextDeviceStatus, side);
+    }
   }
 
 
@@ -87,7 +102,7 @@ export class FrankenMonitor {
     const franken = await connectFranken();
     this.deviceStatus = await franken.getDeviceStatus(false);
     let hasGestures = this.deviceStatus.coverVersion !== Version.Pod3;
-    let waitTime = hasGestures ? 2_000 : 60_000;
+    let waitTime = hasGestures ? config.gesturePollIntervalMs : STATUS_POLL_INTERVAL_MS;
     if (hasGestures) {
       this.deviceStatus = await franken.getDeviceStatus(true);
       logger.debug(`Gestures supported for ${this.deviceStatus.coverVersion}`);
@@ -99,14 +114,14 @@ export class FrankenMonitor {
       try {
         while (this.isRunning) {
           hasGestures = this.deviceStatus.coverVersion !== Version.Pod3;
-          waitTime = hasGestures ? 2_000 : 60_000;
+          waitTime = hasGestures ? config.gesturePollIntervalMs : STATUS_POLL_INTERVAL_MS;
           await wait(waitTime);
           if (!this.isRunning) break;
           const franken = await connectFranken();
-          const nextDeviceStatus = await franken.getDeviceStatus(hasGestures);
-          await settingsDB.read();
+          // Quiet: at the gesture poll rate, per-message debug logs would flood the log file
+          const nextDeviceStatus = await franken.getDeviceStatus(hasGestures, hasGestures);
           if (hasGestures) {
-            this.processGestures(nextDeviceStatus);
+            await this.processGestures(nextDeviceStatus);
           }
           this.deviceStatus = nextDeviceStatus;
           serverStatus.status.frankenMonitor.status = 'healthy';
@@ -118,7 +133,7 @@ export class FrankenMonitor {
         serverStatus.status.frankenMonitor.message = String(error);
         serverStatus.status.frankenMonitor.timestamp = moment.tz().format();
         logger.error(error instanceof Error ? error.message : String(error), 'franken disconnected');
-        await wait(waitTime);
+        await wait(Math.max(waitTime, RETRY_WAIT_MS));
       }
     }
     logger.debug('FrankenMonitor loop exited');

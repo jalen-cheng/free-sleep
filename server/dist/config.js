@@ -1,5 +1,5 @@
 
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="44c53a08-d710-5872-bc6c-899bebad6c17")}catch(e){}}();
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="6bb777aa-a230-5e4e-944c-e1f4c90b8d88")}catch(e){}}();
 import { existsSync, readFileSync } from 'fs';
 import logger from './logger.js';
 function checkIfDacSockPathConfigured() {
@@ -29,6 +29,15 @@ const FIRMWARE_MAP = {
         dacLocation: '/persistent/deviceinfo/dac.sock',
     },
 };
+const DEFAULT_GESTURE_POLL_INTERVAL_MS = 500;
+const MIN_GESTURE_POLL_INTERVAL_MS = 100;
+// How often to ask Frank for tap counters on Pods with tap support. Override with GESTURE_POLL_INTERVAL_MS.
+function loadGesturePollIntervalMs() {
+    const configuredInterval = Number(process.env.GESTURE_POLL_INTERVAL_MS);
+    if (!Number.isFinite(configuredInterval) || configuredInterval <= 0)
+        return DEFAULT_GESTURE_POLL_INTERVAL_MS;
+    return Math.max(MIN_GESTURE_POLL_INTERVAL_MS, configuredInterval);
+}
 class Config {
     // eslint-disable-next-line no-use-before-define
     static instance;
@@ -36,6 +45,7 @@ class Config {
     lowDbFolder;
     remoteDevMode;
     dacSockPath;
+    gesturePollIntervalMs;
     constructor() {
         if (!process.env.DATA_FOLDER || !process.env.ENV) {
             throw new Error('Missing DATA_FOLDER || ENV in env');
@@ -44,6 +54,7 @@ class Config {
         this.dacSockPath = this.detectSockPath();
         this.dbFolder = process.env.DATA_FOLDER;
         this.lowDbFolder = `${this.dbFolder}lowdb/`;
+        this.gesturePollIntervalMs = loadGesturePollIntervalMs();
     }
     detectSockPath() {
         const dacSockPath = checkIfDacSockPathConfigured();
@@ -71,4 +82,4 @@ class Config {
 }
 export default Config.getInstance();
 //# sourceMappingURL=config.js.map
-//# debugId=44c53a08-d710-5872-bc6c-899bebad6c17
+//# debugId=6bb777aa-a230-5e4e-944c-e1f4c90b8d88
