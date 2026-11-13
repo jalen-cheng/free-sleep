@@ -52,6 +52,7 @@ class FirewallScriptTests(unittest.TestCase):
         self.run_script('block_internet_access.sh')
         self.assertEqual(self.read_rules(), first_rules)
         self.assertEqual(len(first_rules), len(set(first_rules)))
+        self.assertIn('-A OUTPUT -p udp --sport 68 --dport 67 -j ACCEPT', first_rules)
         self.assertEqual(first_rules[-3:], ['-A INPUT -j DROP', '-A OUTPUT -j DROP', 'COMMIT'])
         self.assertEqual(self.read_rules('ip6tables.rules')[-3:], ['-A INPUT -j DROP', '-A OUTPUT -j DROP', 'COMMIT'])
         unit = (self.units / 'free-sleep-firewall.service').read_text()
@@ -85,23 +86,30 @@ class FirewallScriptTests(unittest.TestCase):
         hosts.write_text('127.0.0.1 localhost\n')
         systemctl = self.commands / 'systemctl'
         # Only swupdate.service exists on this fake Pod
+        # swupdate.service is active, swupdate.socket was already masked at install, the rest do not exist
         systemctl.write_text('''#!/bin/sh
 printf 'systemctl %s\\n' "$*" >> "$FIREWALL_LOG"
-if [ "$1" = "list-unit-files" ] && [ "$2" = "swupdate.service" ]; then
-  echo "swupdate.service enabled"
+if [ "$1" = "list-unit-files" ]; then
+  case "$2" in swupdate.service|swupdate.socket) echo "$2 enabled" ;; esac
 fi
+if [ "$1" = "is-enabled" ] && [ "$2" = "swupdate.socket" ]; then echo masked; fi
 ''')
-        result = self.run_script('updater_lockout.sh', 'enable', HOSTS_FILE=str(hosts))
-        self.run_script('updater_lockout.sh', 'enable', HOSTS_FILE=str(hosts))
+        environment = {'HOSTS_FILE': str(hosts), 'MASKED_UNITS_FILE': str(self.folder / 'masked-units')}
+        result = self.run_script('updater_lockout.sh', 'enable', **environment)
+        self.run_script('updater_lockout.sh', 'enable', **environment)
         log = self.log.read_text()
         self.assertIn('systemctl mask --now swupdate.service', log)
+        self.assertNotIn('mask --now swupdate.socket', log)
         self.assertNotIn('mask --now defibrillator.service', log)
         self.assertIn("unit 'defibrillator.service' not found", result.stderr)
         self.assertEqual(hosts.read_text().count('update-api.8slp.net'), 1)
         self.assertIn('0.0.0.0 raw-api-upload.8slp.net', hosts.read_text())
 
-        self.run_script('updater_lockout.sh', 'disable', HOSTS_FILE=str(hosts))
-        self.assertIn('systemctl unmask swupdate.service', self.log.read_text())
+        self.run_script('updater_lockout.sh', 'disable', **environment)
+        log = self.log.read_text()
+        self.assertIn('systemctl unmask swupdate.service', log)
+        # Masked before the lockout ran, so disabling the lockout must leave it masked
+        self.assertNotIn('unmask swupdate.socket', log)
         self.assertEqual(hosts.read_text(), '127.0.0.1 localhost\n')
 
     def test_print_rules_changes_nothing(self):

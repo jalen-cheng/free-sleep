@@ -25,7 +25,9 @@ ALLOW_TAILSCALE=$(resolve_firewall_option ALLOW_TAILSCALE false)
 # https://docs.sentry.io/security-legal-pii/security/ip-ranges/#event-ingestion
 SENTRY_INGESTION_IPS="35.186.247.156 34.120.195.249 34.36.122.224 34.36.87.148 34.120.62.213 130.211.36.74"
 PRIVATE_IPV4_RANGES="10.0.0.0/8 172.16.0.0/12 192.168.0.0/16"
-PRIVATE_IPV6_RANGES="fe80::/10 fd00::/8"
+# Link-local, unique-local, and link-scoped multicast (neighbor discovery, which IPv6 needs to
+# work at all on the LAN). None of these are routed to the internet.
+PRIVATE_IPV6_RANGES="fe80::/10 fd00::/8 ff02::/16"
 # Tailscale's CGNAT range. Its IPv6 range (fd7a:115c:a1e0::/48) is already inside fd00::/8.
 TAILSCALE_IPV4_RANGE="100.64.0.0/10"
 if [ "$ALLOW_TAILSCALE" = "true" ]; then
@@ -42,6 +44,10 @@ build_ipv4_rules() {
   # NTP keeps the system clock (and therefore schedules) correct
   echo "-A INPUT -p udp --sport 123 -j ACCEPT"
   echo "-A OUTPUT -p udp --dport 123 -j ACCEPT"
+  # DHCP: address requests are broadcast, so the LAN ranges below do not cover them.
+  # Without this the Pod could fail to get an address and drop off the network.
+  echo "-A OUTPUT -p udp --sport 68 --dport 67 -j ACCEPT"
+  echo "-A INPUT -p udp --sport 67 --dport 68 -j ACCEPT"
   # Loopback lets local services talk to each other
   echo "-A INPUT -i lo -j ACCEPT"
   echo "-A OUTPUT -o lo -j ACCEPT"
