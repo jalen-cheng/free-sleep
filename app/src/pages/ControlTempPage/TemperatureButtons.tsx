@@ -1,21 +1,21 @@
 import { useTheme } from '@mui/material/styles';
 import { Button, Box, Typography } from '@mui/material';
 import { Add, Remove } from '@mui/icons-material';
-import { MIN_TEMP_F, MAX_TEMP_F, formatTemperatureDelta } from '@lib/temperatureConversions.ts';
-
-// How far one press of + or - moves the target
-export const BUTTON_STEP_F = 1;
+import {
+  MIN_TEMP_F, MAX_TEMP_F, TemperatureFormat, formatTemperatureDelta, getStepSizeF,
+} from '@lib/temperatureConversions.ts';
 
 type TemperatureButtonsProps = {
   // The target shown on screen, which may be ahead of what the Pod has confirmed
   targetTemperatureF: number;
-  displayCelsius: boolean;
+  temperatureFormat: TemperatureFormat;
   disabled: boolean;
-  onStep: (changeF: number) => void;
+  // Called with -1 or +1: one step of the display unit colder or warmer
+  onStep: (steps: number) => void;
 }
 
 // The - and + buttons under the dial, with the size of one step shown between them
-export default function TemperatureButtons({ targetTemperatureF, displayCelsius, disabled, onStep }: TemperatureButtonsProps) {
+export default function TemperatureButtons({ targetTemperatureF, temperatureFormat, disabled, onStep }: TemperatureButtonsProps) {
   const theme = useTheme();
   const iconColor = theme.palette.text.primary;
 
@@ -47,19 +47,19 @@ export default function TemperatureButtons({ targetTemperatureF, displayCelsius,
         color="primary"
         aria-label="Decrease temperature"
         sx={ buttonStyle }
-        onClick={ () => onStep(-BUTTON_STEP_F) }
+        onClick={ () => onStep(-1) }
         disabled={ disabled || targetTemperatureF <= MIN_TEMP_F }
       >
         <Remove sx={ { color: iconColor } }/>
       </Button>
-      <Typography variant="caption" sx={ { width: 88, textAlign: 'center', color: 'text.secondary' } }>
-        { formatTemperatureDelta(BUTTON_STEP_F, displayCelsius) } steps
+      <Typography variant="caption" sx={ { width: 96, textAlign: 'center', color: 'text.secondary' } }>
+        { formatTemperatureDelta(getStepSizeF(temperatureFormat), temperatureFormat) } steps
       </Typography>
       <Button
         variant="outlined"
         aria-label="Increase temperature"
         sx={ buttonStyle }
-        onClick={ () => onStep(BUTTON_STEP_F) }
+        onClick={ () => onStep(1) }
         disabled={ disabled || targetTemperatureF >= MAX_TEMP_F }
       >
         <Add sx={ { color: iconColor } }/>

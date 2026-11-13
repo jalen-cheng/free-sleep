@@ -11,8 +11,7 @@ export type SharedTapSettings = {
   inactiveAlarmBehavior: AlarmTapConfig['inactiveAlarmBehavior'];
 };
 
-export const MIN_TEMPERATURE_STEP_F = 1;
-export const MAX_TEMPERATURE_STEP_F = 10;
+const MIN_TEMPERATURE_STEP_F = 1;
 
 const DEFAULT_TAP_SETTINGS: SharedTapSettings = {
   temperatureStepF: MIN_TEMPERATURE_STEP_F,

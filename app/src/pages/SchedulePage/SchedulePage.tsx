@@ -18,7 +18,7 @@ import { postSchedules } from '@api/schedules';
 import { useAppStore } from '@state/appStore.tsx';
 import { useSchedules } from '@api/schedules';
 import { useScheduleStore } from './scheduleStore.tsx';
-import { useSettings } from '@api/settings';
+import { useTemperatureFormat } from '@lib/useTemperatureFormat.ts';
 import { LOWERCASE_DAYS } from './days.ts';
 import TemperatureScheduleChart from './ScheduleChart.tsx';
 import ErrorBoundary from '@components/ErrorBoundary.tsx';
@@ -53,8 +53,7 @@ export default function SchedulePage() {
     checkForChanges,
     selectDay
   } = useScheduleStore();
-  const { data: settings } = useSettings();
-  const displayCelsius = settings?.temperatureFormat === 'celsius';
+  const temperatureFormat = useTemperatureFormat();
   // TODO: Add changes lost notification using changesPresent when user tries to switch tab before saving
 
   useEffect(() => {
@@ -117,8 +116,8 @@ export default function SchedulePage() {
         <TemperatureScheduleChart />
       </ErrorBoundary>
 
-      <PowerScheduleSection displayCelsius={ displayCelsius }/>
-      <TemperatureAdjustmentsAccordion displayCelsius={ displayCelsius }/>
+      <PowerScheduleSection temperatureFormat={ temperatureFormat }/>
+      <TemperatureAdjustmentsAccordion temperatureFormat={ temperatureFormat }/>
       <AlarmAccordion/>
       <ApplyToOtherDaysAccordion/>
       <Box sx={ { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', minHeight: 40 } }>

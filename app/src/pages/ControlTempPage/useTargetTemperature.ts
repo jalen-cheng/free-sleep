@@ -1,8 +1,8 @@
-import _ from 'lodash';
 import { useCallback, useEffect, useRef } from 'react';
 import { postDeviceStatus } from '@api/deviceStatus.ts';
 import { useAppStore } from '@state/appStore.tsx';
-import { MAX_TEMP_F, MIN_TEMP_F } from '@lib/temperatureConversions.ts';
+import { snapTemperature, stepTemperature } from '@lib/temperatureConversions.ts';
+import { useTemperatureFormat } from '@lib/useTemperatureFormat.ts';
 import { buildSidesPayload, getControlledSides } from '@lib/sides.ts';
 import { useControlTempStore } from './controlTempStore.tsx';
 
@@ -19,22 +19,24 @@ const wait = (milliseconds: number) => new Promise(resolve => setTimeout(resolve
 // it with older values polled from the Pod (see `hasPendingEdit`).
 export function useTargetTemperature(refetch: () => Promise<unknown>) {
   const { side, linkSides } = useAppStore();
+  const temperatureFormat = useTemperatureFormat();
   const setDeviceStatus = useControlTempStore(state => state.setDeviceStatus);
   const setHasPendingEdit = useControlTempStore(state => state.setHasPendingEdit);
   const commitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Counts edits, so a slow request can tell that a newer edit has replaced it
   const editCount = useRef(0);
 
-  // Shows a new target on screen without sending it. Returns the clamped value.
+  // Shows a new target on screen without sending it. Returns the value used, which is the
+  // nearest one the display unit can show (a whole °F, or a whole level).
   const previewTargetTemperature = useCallback((temperatureF: number) => {
-    const targetTemperatureF = _.clamp(Math.round(temperatureF), MIN_TEMP_F, MAX_TEMP_F);
+    const targetTemperatureF = snapTemperature(temperatureF, temperatureFormat);
     const currentTarget = useControlTempStore.getState().deviceStatus?.[side]?.targetTemperatureF;
     if (targetTemperatureF === currentTarget) return targetTemperatureF;
     editCount.current += 1;
     setHasPendingEdit(true);
     setDeviceStatus(buildSidesPayload(getControlledSides(side, linkSides), { targetTemperatureF }));
     return targetTemperatureF;
-  }, [side, linkSides, setDeviceStatus, setHasPendingEdit]);
+  }, [side, linkSides, temperatureFormat, setDeviceStatus, setHasPendingEdit]);
 
   // Sends the target shown on screen to the Pod, then reloads the Pod's state
   const commitTargetTemperature = useCallback(async () => {
@@ -56,14 +58,14 @@ export function useTargetTemperature(refetch: () => Promise<unknown>) {
     if (editCount.current === editCountAtCommit) setHasPendingEdit(false);
   }, [side, linkSides, refetch, setHasPendingEdit]);
 
-  // Moves the target by a number of °F and sends it once the presses stop
-  const stepTargetTemperature = useCallback((changeF: number) => {
+  // Moves the target by a number of display-unit steps and sends it once the presses stop
+  const stepTargetTemperature = useCallback((steps: number) => {
     const currentTarget = useControlTempStore.getState().deviceStatus?.[side]?.targetTemperatureF;
     if (currentTarget === undefined) return;
-    previewTargetTemperature(currentTarget + changeF);
+    previewTargetTemperature(stepTemperature(currentTarget, steps, temperatureFormat));
     if (commitTimer.current) clearTimeout(commitTimer.current);
     commitTimer.current = setTimeout(() => void commitTargetTemperature(), COMMIT_DELAY_MS);
-  }, [side, previewTargetTemperature, commitTargetTemperature]);
+  }, [side, temperatureFormat, previewTargetTemperature, commitTargetTemperature]);
 
   // Switching side or leaving the page sends a waiting change right away instead of dropping it
   useEffect(() => () => {

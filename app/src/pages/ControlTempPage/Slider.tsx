@@ -9,8 +9,9 @@ import { useTargetTemperature } from './useTargetTemperature.ts';
 import { useTheme } from '@mui/material/styles';
 import { useResizeDetector } from 'react-resize-detector';
 import { useSettings } from '@api/settings.ts';
+import { useTemperatureFormat } from '@lib/useTemperatureFormat.ts';
 import {
-  MAX_TEMP_F, MIN_TEMP_F, formatEightSleepLevel, formatTemperature, getTemperatureColor,
+  MAX_TEMP_F, MIN_TEMP_F, formatTemperature, getTemperatureColor,
 } from '@lib/temperatureConversions.ts';
 
 type SliderProps = {
@@ -18,16 +19,16 @@ type SliderProps = {
   currentTargetTemp: number;
   currentTemperatureF: number;
   refetch: () => Promise<unknown>;
-  displayCelsius: boolean;
 }
 
 // Labels for the two ends of the dial, placed just under where the arc stops
 const rangeLabelSx = { position: 'absolute', top: '72%', color: 'text.secondary', pointerEvents: 'none' };
 
-export default function Slider({ isOn, currentTargetTemp, refetch, currentTemperatureF, displayCelsius }: SliderProps) {
+export default function Slider({ isOn, currentTargetTemp, refetch, currentTemperatureF }: SliderProps) {
   const deviceStatus = useControlTempStore(state => state.deviceStatus);
   const { isUpdating, side } = useAppStore();
   const { data: settings } = useSettings();
+  const temperatureFormat = useTemperatureFormat();
   const { previewTargetTemperature, commitTargetTemperature, stepTargetTemperature } = useTargetTemperature(refetch);
   const isInAwayMode = settings?.[side]?.awayMode;
   const disabled = isUpdating || isInAwayMode || !isOn;
@@ -82,24 +83,24 @@ export default function Slider({ isOn, currentTargetTemp, refetch, currentTemper
               sliderColor={ sliderColor }
               currentTargetTemp={ currentTargetTemp }
               currentTemperatureF={ currentTemperatureF }
-              displayCelsius={ displayCelsius }
+              temperatureFormat={ temperatureFormat }
             />
           </CircularSliderWithChildren>
         </div>
         { isOn && (
           <>
             <Typography variant="caption" sx={ { ...rangeLabelSx, left: 0 } }>
-              { formatTemperature(MIN_TEMP_F, displayCelsius) }
+              { formatTemperature(MIN_TEMP_F, temperatureFormat) }
             </Typography>
             <Typography variant="caption" sx={ { ...rangeLabelSx, right: 0 } }>
-              { formatTemperature(MAX_TEMP_F, displayCelsius) }
+              { formatTemperature(MAX_TEMP_F, temperatureFormat) }
             </Typography>
           </>
         ) }
         { isOn && !isInAwayMode && (
           <TemperatureButtons
             targetTemperatureF={ targetTemperatureF }
-            displayCelsius={ displayCelsius }
+            temperatureFormat={ temperatureFormat }
             disabled={ isUpdating }
             onStep={ stepTargetTemperature }
           />
@@ -108,7 +109,10 @@ export default function Slider({ isOn, currentTargetTemp, refetch, currentTemper
       { isOn && (
         <Box sx={ { textAlign: 'center', mb: 1.5 } }>
           <Typography variant="caption" sx={ { color: 'text.secondary' } }>
-            About { formatEightSleepLevel(targetTemperatureF) } in the Eight Sleep app
+            { /* Shows the target in the other scale, so levels and degrees can be matched up */ }
+            { temperatureFormat === 'level'
+              ? `About ${formatTemperature(targetTemperatureF, 'fahrenheit')}`
+              : `About ${formatTemperature(targetTemperatureF, 'level')} in the Eight Sleep app` }
           </Typography>
         </Box>
       ) }

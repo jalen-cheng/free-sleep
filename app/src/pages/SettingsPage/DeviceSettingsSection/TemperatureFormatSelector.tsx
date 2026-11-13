@@ -7,6 +7,7 @@ import { DeepPartial } from 'ts-essentials';
 import { Settings } from '@api/settingsSchema.ts';
 import { useAppStore } from '@state/appStore.tsx';
 import { TEMPERATURES } from '@api/settingsSchema.ts';
+import { DEFAULT_TEMPERATURE_FORMAT } from '@lib/temperatureConversions.ts';
 
 type TemperatureFormatSelectorProps = {
   settings?: Settings
@@ -36,7 +37,7 @@ export default function TemperatureFormatSelector({
       <ToggleButtonGroup
         disabled={ isUpdating }
         color='primary'
-        value={ settings?.temperatureFormat || 'farenheit' }
+        value={ settings?.temperatureFormat || DEFAULT_TEMPERATURE_FORMAT }
         exclusive
         onChange={ handleChange }
         aria-label="Temperature format"
