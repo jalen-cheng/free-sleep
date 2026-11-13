@@ -15,6 +15,7 @@ import Donate from './Donate.tsx';
 import DiscordLink from './DiscordLink.tsx';
 import FeaturesSection from './FeaturesSection/FeaturesSection.tsx';
 import Section from './Section.tsx';
+import TapGesturesSection from './TapGesturesSection/TapGesturesSection.tsx';
 import SettingsHint from './SettingsHint.tsx';
 import DeviceSettingsSection from './DeviceSettingsSection/DeviceSettingsSection.tsx';
 import DeviceInfo from './DeviceSettingsSection/DeviceInfo.tsx';
@@ -61,6 +62,9 @@ export default function SettingsPage() {
             </SettingsHint>
           </Box>
         </Section>
+      </ErrorBoundary>
+      <ErrorBoundary componentName="Tap gestures">
+        <TapGesturesSection settings={ settings } updateSettings={ updateSettings }/>
       </ErrorBoundary>
       <ErrorBoundary componentName="Priming settings">
         <Section title="Priming" icon={ <WaterDropOutlinedIcon/> }>
