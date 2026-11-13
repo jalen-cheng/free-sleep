@@ -28,6 +28,8 @@ export default function TapGesturesSection({ settings, updateSettings }: TapGest
   const { data: deviceStatus } = useDeviceStatus();
   if (!settings || !deviceStatus || deviceStatus.coverVersion === Version.Pod3) return null;
 
+  const displayCelsius = settings.temperatureFormat === 'celsius';
+
   return (
     <Section title="Tap gestures" icon={ <TouchAppOutlinedIcon/> }>
       <Box sx={ { display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2.5 } }>
@@ -45,6 +47,7 @@ export default function TapGesturesSection({ settings, updateSettings }: TapGest
                 { gestureIndex > 0 && <Divider/> }
                 <TapGestureControl
                   label={ GESTURE_LABELS[gesture] }
+                  displayCelsius={ displayCelsius }
                   tapConfig={ settings[side].taps[gesture] }
                   onChange={ (tapConfig) => updateSettings({ [side]: { taps: { [gesture]: tapConfig } } }) }
                 />
@@ -57,7 +60,7 @@ export default function TapGesturesSection({ settings, updateSettings }: TapGest
         <SettingsHint>
           Tap the side of the bed, near where you sleep.
           Alarm taps dismiss or snooze an alarm while it is vibrating.
-          Temperature steps are always in °F.
+          { displayCelsius && ' The Pod steps in whole °F, so °C amounts are rounded.' }
         </SettingsHint>
       </Box>
     </Section>

@@ -7,6 +7,13 @@ export function formatTemperature(temperature: number, celcius: boolean) {
   return celcius ? `${farenheitToCelcius(temperature)}°C` : `${temperature}°F`;
 }
 
+// Formats a temperature difference (a step, not a reading), so no 32° offset is applied.
+export function formatTemperatureDelta(deltaF: number, celcius: boolean) {
+  if (!celcius) return `${deltaF}°F`;
+  const deltaC = Math.round(deltaF * 5 / 9 * 2) / 2;
+  return `${deltaC}°C`;
+}
+
 
 export const MIN_TEMP_F = 55;
 export const MAX_TEMP_F = 110;

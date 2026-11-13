@@ -1,3 +1,4 @@
+import _ from 'lodash';
 import { useRef, useCallback } from 'react';
 import { useTheme } from '@mui/material/styles';
 import { Button, Box } from '@mui/material';
@@ -46,15 +47,20 @@ export default function TemperatureButtons({ refetch, currentTargetTemp }: Tempe
   if (isInAwayMode) return null;
 
   const disabled = isUpdating || isInAwayMode;
+  // The value being edited, which runs ahead of what the Pod last reported
+  const pendingTargetTemp = deviceStatus?.[side]?.targetTemperatureF ?? currentTargetTemp;
   const borderColor = theme.palette.divider;
   const iconColor = theme.palette.text.primary;
 
   const handleClick = (change: number) => {
     if (!deviceStatus) return;
-    if (deviceStatus === undefined) return;
+    // Repeated presses land before the Pod reports back, so clamp the pending value here.
+    // An out-of-range value is rejected by the server and the whole adjustment is lost.
+    const nextTargetTemperatureF = _.clamp(deviceStatus[side].targetTemperatureF + change, MIN_TEMP_F, MAX_TEMP_F);
+    if (nextTargetTemperatureF === deviceStatus[side].targetTemperatureF) return;
     setDeviceStatus({
       [side]: {
-        targetTemperatureF: deviceStatus[side].targetTemperatureF + change,
+        targetTemperatureF: nextTargetTemperatureF,
       }
     });
 
@@ -91,7 +97,7 @@ export default function TemperatureButtons({ refetch, currentTargetTemp }: Tempe
         aria-label="Decrease temperature"
         sx={ buttonStyle }
         onClick={ () => handleClick(-1) }
-        disabled={ disabled || currentTargetTemp <= MIN_TEMP_F }
+        disabled={ disabled || pendingTargetTemp <= MIN_TEMP_F }
       >
         <Remove sx={ { color: iconColor } }/>
       </Button>
@@ -101,7 +107,7 @@ export default function TemperatureButtons({ refetch, currentTargetTemp }: Tempe
         sx={ buttonStyle }
 
         onClick={ () => handleClick(1) }
-        disabled={ disabled || currentTargetTemp >= MAX_TEMP_F }
+        disabled={ disabled || pendingTargetTemp >= MAX_TEMP_F }
       >
         <Add sx={ { color: iconColor } }/>
       </Button>
