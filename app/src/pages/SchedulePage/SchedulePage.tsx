@@ -23,6 +23,7 @@ import { LOWERCASE_DAYS } from './days.ts';
 import TemperatureScheduleChart from './ScheduleChart.tsx';
 import ErrorBoundary from '@components/ErrorBoundary.tsx';
 import PageHeader from '@components/PageHeader.tsx';
+import { buildSidesPayload, getControlledSides } from '@lib/sides.ts';
 
 
 const getAdjustedDayOfWeek = (): DayOfWeek => {
@@ -41,7 +42,7 @@ const getAdjustedDayOfWeek = (): DayOfWeek => {
 
 
 export default function SchedulePage() {
-  const { setIsUpdating, side } = useAppStore();
+  const { setIsUpdating, side, linkSides } = useAppStore();
   const { data: schedules, refetch } = useSchedules();
   const {
     selectedSchedule,
@@ -49,6 +50,7 @@ export default function SchedulePage() {
     selectedDays,
     selectedDay,
     reloadScheduleData,
+    checkForChanges,
     selectDay
   } = useScheduleStore();
   const { data: settings } = useSettings();
@@ -72,16 +74,18 @@ export default function SchedulePage() {
     reloadScheduleData();
   }, [side]);
 
+  // Linking or unlinking changes whether the other side's schedule counts as unsaved
+  useEffect(() => {
+    checkForChanges();
+  }, [linkSides]);
+
   const handleSave = async () => {
     setIsUpdating(true);
 
     const daysList: DayOfWeek[] = _.uniq(_.keys(_.pickBy(selectedDays, value => value))) as DayOfWeek[];
     daysList.push(selectedDay);
-    const payload: DeepPartial<Schedules> = { [side]: {}, };
-    daysList.forEach(day => {
-      // @ts-expect-error
-      payload[side][day] = selectedSchedule;
-    });
+    const daySchedules = Object.fromEntries(daysList.map(day => [day, selectedSchedule]));
+    const payload: DeepPartial<Schedules> = buildSidesPayload(getControlledSides(side, linkSides), daySchedules);
 
     await postSchedules(payload)
       .then(() => {
@@ -106,7 +110,7 @@ export default function SchedulePage() {
       } }
     >
       <PageHeader title="Schedules"/>
-      <SideControl/>
+      <SideControl linkedHint="Sides linked: saving applies this schedule to both."/>
 
       <DayTabs/>
       <ErrorBoundary componentName='Scheduling chart'>

@@ -13,14 +13,18 @@ import Slider from './Slider.tsx';
 import WaterNotification from './WaterNotification.tsx';
 import { useAppStore } from '@state/appStore.tsx';
 import { useControlTempStore } from './controlTempStore.tsx';
-import { useDeviceStatus } from '@api/deviceStatus';
+import { postDeviceStatus, useDeviceStatus } from '@api/deviceStatus';
+import { getOtherSide } from '@lib/sides.ts';
 import { useSettings } from '@api/settings.ts';
+
+// The Pod takes a moment to report a change back
+const STATUS_SETTLE_MS = 1_000;
 
 export default function ControlTempPage() {
   const { isError, isPending, refetch, data: deviceStatus } = useDeviceStatus();
   const setDeviceStatus = useControlTempStore(state => state.setDeviceStatus);
   const { data: settings } = useSettings();
-  const { isUpdating, side } = useAppStore();
+  const { isUpdating, setIsUpdating, side } = useAppStore();
   const sideStatus = deviceStatus?.[side];
   const isOn = sideStatus?.isOn || false;
 
@@ -31,9 +35,28 @@ export default function ControlTempPage() {
     if (deviceStatus && !hasPendingEdit) setDeviceStatus(deviceStatus);
   }, [deviceStatus, hasPendingEdit, setDeviceStatus]);
 
+  // Linking brings the other side in line with this one straight away, so both start from the same state
+  const handleLinkSidesChange = (linkSides: boolean) => {
+    if (!linkSides || !sideStatus) return;
+    // The temperature is only sent to a side that is on, so a side that is off stays off
+    const matchingStatus = sideStatus.isOn
+      ? { isOn: true, targetTemperatureF: sideStatus.targetTemperatureF }
+      : { isOn: false };
+    setIsUpdating(true);
+    postDeviceStatus({ [getOtherSide(side)]: matchingStatus })
+      .then(() => new Promise(resolve => setTimeout(resolve, STATUS_SETTLE_MS)))
+      .then(() => refetch())
+      .catch(error => console.error(error))
+      .finally(() => setIsUpdating(false));
+  };
+
   return (
     <PageContainer sx={ { maxWidth: 600, gap: 2, pt: { xs: 2.5, md: 5 } } }>
-      <SideControl showTemp/>
+      <SideControl
+        showTemp
+        linkedHint="Sides linked: temperature and power changes apply to both."
+        onLinkSidesChange={ handleLinkSidesChange }
+      />
       <Paper
         sx={ {
           px: { xs: 0, sm: 3 }, py: { xs: 1.5, sm: 3 }, overflow: 'hidden',

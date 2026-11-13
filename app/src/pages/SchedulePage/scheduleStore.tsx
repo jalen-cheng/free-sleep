@@ -7,6 +7,7 @@ import { DaysSelected } from './SchedulePage.types.ts';
 import { useAppStore } from '@state/appStore.tsx';
 import { LOWERCASE_DAYS } from './days';
 import { isPowerScheduleDurationValid } from './scheduleValidation';
+import { getOtherSide } from '@lib/sides.ts';
 
 
 
@@ -76,6 +77,8 @@ export const useScheduleStore = create<ScheduleStore>((set, get) => ({
       selectedSchedule,
       changesPresent: false,
     });
+    // With linked sides, a difference between the two sides is itself something to save
+    get().checkForChanges();
   },
 
   selectDay: (newSelectedDayIndex) => {
@@ -109,8 +112,12 @@ export const useScheduleStore = create<ScheduleStore>((set, get) => ({
   checkForChanges: () => {
     const { selectedDay, selectedSchedule, originalSchedules, selectedDays } = get();
     if (!originalSchedules) return;
-    const { side } = useAppStore.getState();
-    const changesPresent = !_.isEqual(originalSchedules[side][selectedDay], selectedSchedule) || _.some(selectedDays, value => value === true);
+    const { side, linkSides } = useAppStore.getState();
+    // When the sides are linked, saving also copies this schedule to the other side
+    const otherSideDiffers = linkSides && !_.isEqual(originalSchedules[getOtherSide(side)][selectedDay], selectedSchedule);
+    const changesPresent = !_.isEqual(originalSchedules[side][selectedDay], selectedSchedule)
+      || _.some(selectedDays, value => value === true)
+      || otherSideDiffers;
 
     set({ changesPresent });
   },
