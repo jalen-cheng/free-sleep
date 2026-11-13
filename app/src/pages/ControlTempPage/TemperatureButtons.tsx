@@ -1,75 +1,27 @@
-import _ from 'lodash';
-import { useRef, useCallback } from 'react';
 import { useTheme } from '@mui/material/styles';
-import { Button, Box } from '@mui/material';
+import { Button, Box, Typography } from '@mui/material';
 import { Add, Remove } from '@mui/icons-material';
-import { useControlTempStore } from './controlTempStore.tsx';
-import { useAppStore } from '@state/appStore.tsx';
-import { postDeviceStatus } from '@api/deviceStatus.ts';
-import { useSettings } from '@api/settings.ts';
-import { MIN_TEMP_F, MAX_TEMP_F } from '@lib/temperatureConversions.ts';
+import { MIN_TEMP_F, MAX_TEMP_F, formatTemperatureDelta } from '@lib/temperatureConversions.ts';
+
+// How far one press of + or - moves the target
+export const BUTTON_STEP_F = 1;
 
 type TemperatureButtonsProps = {
-  refetch: any;
-  currentTargetTemp: number;
+  // The target shown on screen, which may be ahead of what the Pod has confirmed
+  targetTemperatureF: number;
+  displayCelsius: boolean;
+  disabled: boolean;
+  onStep: (changeF: number) => void;
 }
 
-const DEBOUNCE_MS = 2000;
-export default function TemperatureButtons({ refetch, currentTargetTemp }: TemperatureButtonsProps) {
-  const { side, setIsUpdating, isUpdating } = useAppStore();
-  const { deviceStatus, setDeviceStatus } = useControlTempStore();
-  const { data: settings } = useSettings();
+// The - and + buttons under the dial, with the size of one step shown between them
+export default function TemperatureButtons({ targetTemperatureF, displayCelsius, disabled, onStep }: TemperatureButtonsProps) {
   const theme = useTheme();
-  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const postUpdate = useCallback(async () => {
-    setIsUpdating(true);
-    try {
-      await postDeviceStatus({
-        [side]: { targetTemperatureF: deviceStatus?.[side]?.targetTemperatureF },
-      });
-      await new Promise(r => setTimeout(r, 1_500));
-      await refetch?.();
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsUpdating(false);
-    }
-  }, [deviceStatus, side, refetch, setIsUpdating]);
-
-  const scheduleUpdate = useCallback(() => {
-    if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    debounceTimer.current = setTimeout(postUpdate, DEBOUNCE_MS);
-  }, [postUpdate]);
-
-
-  const isInAwayMode = settings?.[side]?.awayMode;
-  if (isInAwayMode) return null;
-
-  const disabled = isUpdating || isInAwayMode;
-  // The value being edited, which runs ahead of what the Pod last reported
-  const pendingTargetTemp = deviceStatus?.[side]?.targetTemperatureF ?? currentTargetTemp;
-  const borderColor = theme.palette.divider;
   const iconColor = theme.palette.text.primary;
-
-  const handleClick = (change: number) => {
-    if (!deviceStatus) return;
-    // Repeated presses land before the Pod reports back, so clamp the pending value here.
-    // An out-of-range value is rejected by the server and the whole adjustment is lost.
-    const nextTargetTemperatureF = _.clamp(deviceStatus[side].targetTemperatureF + change, MIN_TEMP_F, MAX_TEMP_F);
-    if (nextTargetTemperatureF === deviceStatus[side].targetTemperatureF) return;
-    setDeviceStatus({
-      [side]: {
-        targetTemperatureF: nextTargetTemperatureF,
-      }
-    });
-
-    scheduleUpdate();
-  };
 
   const buttonStyle = {
     borderWidth: '1px',
-    borderColor,
+    borderColor: theme.palette.divider,
     width: 48,
     height: 48,
     borderRadius: '50%',
@@ -85,7 +37,6 @@ export default function TemperatureButtons({ refetch, currentTargetTemp }: Tempe
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
-        gap: '88px',
         width: '100%',
         marginLeft: 'auto',
         marginRight: 'auto',
@@ -96,18 +47,20 @@ export default function TemperatureButtons({ refetch, currentTargetTemp }: Tempe
         color="primary"
         aria-label="Decrease temperature"
         sx={ buttonStyle }
-        onClick={ () => handleClick(-1) }
-        disabled={ disabled || pendingTargetTemp <= MIN_TEMP_F }
+        onClick={ () => onStep(-BUTTON_STEP_F) }
+        disabled={ disabled || targetTemperatureF <= MIN_TEMP_F }
       >
         <Remove sx={ { color: iconColor } }/>
       </Button>
+      <Typography variant="caption" sx={ { width: 88, textAlign: 'center', color: 'text.secondary' } }>
+        { formatTemperatureDelta(BUTTON_STEP_F, displayCelsius) } steps
+      </Typography>
       <Button
         variant="outlined"
         aria-label="Increase temperature"
         sx={ buttonStyle }
-
-        onClick={ () => handleClick(1) }
-        disabled={ disabled || pendingTargetTemp >= MAX_TEMP_F }
+        onClick={ () => onStep(BUTTON_STEP_F) }
+        disabled={ disabled || targetTemperatureF >= MAX_TEMP_F }
       >
         <Add sx={ { color: iconColor } }/>
       </Button>
