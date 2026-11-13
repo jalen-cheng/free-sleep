@@ -23,7 +23,7 @@ export default function EnabledSwitch() {
           disabled={ isUpdating }
         />
       }
-      label="Enabled"
+      label="Schedule enabled"
     />
   );
 }

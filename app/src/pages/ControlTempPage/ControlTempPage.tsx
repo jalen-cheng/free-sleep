@@ -25,9 +25,11 @@ export default function ControlTempPage() {
   const isOn = sideStatus?.isOn || false;
 
   useEffect(() => { refetch(); }, [side, refetch]);
+  const hasPendingEdit = useControlTempStore(state => state.hasPendingEdit);
+  // Polled state must not replace a temperature the user is still adjusting
   useEffect(() => {
-    if (deviceStatus) setDeviceStatus(deviceStatus);
-  }, [deviceStatus, setDeviceStatus]);
+    if (deviceStatus && !hasPendingEdit) setDeviceStatus(deviceStatus);
+  }, [deviceStatus, hasPendingEdit, setDeviceStatus]);
 
   return (
     <PageContainer sx={ { maxWidth: 600, gap: 2, pt: { xs: 2.5, md: 5 } } }>

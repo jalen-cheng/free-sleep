@@ -114,13 +114,13 @@ export default function SchedulePage() {
       </ErrorBoundary>
 
       <PowerScheduleSection displayCelsius={ displayCelsius }/>
-      <Box sx={ { mt: 2, display: 'flex', justifyContent: 'space-between', width: '100%', mb: 2 } }>
-        <EnabledSwitch/>
-        <SaveButton onSave={ handleSave }/>
-      </Box>
       <TemperatureAdjustmentsAccordion displayCelsius={ displayCelsius }/>
       <AlarmAccordion/>
       <ApplyToOtherDaysAccordion/>
+      <Box sx={ { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', minHeight: 40 } }>
+        <EnabledSwitch/>
+        <SaveButton onSave={ handleSave }/>
+      </Box>
 
     </PageContainer>
   );
