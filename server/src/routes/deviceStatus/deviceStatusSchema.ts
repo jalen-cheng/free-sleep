@@ -2,12 +2,15 @@
 
 import { z } from 'zod';
 
+export const MIN_TARGET_TEMPERATURE_F = 55;
+export const MAX_TARGET_TEMPERATURE_F = 110;
+
 const SideStatusSchema = z.object({
   currentTemperatureLevel: z.number(),
   currentTemperatureF: z.number(),
   targetTemperatureF: z.number()
-    .min(55, { message: 'Temperature must be at least 55°F' })
-    .max(110, { message: 'Temperature cannot exceed 110°F' }),
+    .min(MIN_TARGET_TEMPERATURE_F, { message: `Temperature must be at least ${MIN_TARGET_TEMPERATURE_F}°F` })
+    .max(MAX_TARGET_TEMPERATURE_F, { message: `Temperature cannot exceed ${MAX_TARGET_TEMPERATURE_F}°F` }),
   secondsRemaining: z.number(),
   isOn: z.boolean(),
   isAlarmVibrating: z.boolean(),

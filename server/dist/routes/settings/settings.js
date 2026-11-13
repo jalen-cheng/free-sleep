@@ -1,11 +1,18 @@
 
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="eaf48186-a5b6-54da-ab23-bdff5c9496c4")}catch(e){}}();
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="7d20c6e1-2bde-5f23-b07f-62e8b06dc0b4")}catch(e){}}();
 import _ from 'lodash';
 import express from 'express';
 import logger from '../../logger.js';
 const router = express.Router();
 import settingsDB from '../../db/settings.js';
-import { SettingsSchema } from '../../db/settingsSchema.js';
+import { SettingsSchema, TapConfig } from '../../db/settingsSchema.js';
+// Tap configs are one of two shapes picked by `type`. Replace them as a whole instead of merging,
+// so switching type does not leave the other shape's fields behind in settingsDB.json.
+const replaceTapConfig = (_existingValue, newValue) => {
+    if (TapConfig.safeParse(newValue).success)
+        return newValue;
+    return undefined;
+};
 router.get('/settings', async (req, res) => {
     await settingsDB.read();
     res.json(settingsDB.data);
@@ -23,10 +30,10 @@ router.post('/settings', async (req, res) => {
     }
     delete body.id;
     await settingsDB.read();
-    _.merge(settingsDB.data, body);
+    _.mergeWith(settingsDB.data, body, replaceTapConfig);
     await settingsDB.write();
     res.status(200).json(settingsDB.data);
 });
 export default router;
 //# sourceMappingURL=settings.js.map
-//# debugId=eaf48186-a5b6-54da-ab23-bdff5c9496c4
+//# debugId=7d20c6e1-2bde-5f23-b07f-62e8b06dc0b4

@@ -1,5 +1,5 @@
 
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="19743398-7780-5bb6-8302-1ea6556da568")}catch(e){}}();
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="49882277-79b8-5a90-a767-8757444e0f3f")}catch(e){}}();
 import { SequentialQueue } from './sequentialQueue.js';
 import { MessageReadTimeoutError, MessageStream } from './messageStream.js';
 import { frankenCommands } from './deviceApi.js';
@@ -30,17 +30,30 @@ export class Franken {
     messageStream;
     sequentialQueue;
     static responseDelayMs = 10;
+    static unsolicitedPreviewLength = 300;
     constructor(socket, messageStream, sequentialQueue) {
         this.socket = socket;
         this.messageStream = messageStream;
         this.sequentialQueue = sequentialQueue;
     }
     static separator = Buffer.from('\n\n');
-    async sendMessage(message) {
-        logger.debug(`Sending message to sock | message: ${message}`);
+    // Frank only speaks when spoken to, as far as we know. Anything already queued before a request
+    // goes out was not asked for: log it (it may be a pushed event such as a tap) and drop it so it
+    // is not mistaken for the response to this request.
+    logUnsolicitedMessages() {
+        for (const unsolicitedMessage of this.messageStream.takeQueuedMessages()) {
+            const preview = unsolicitedMessage.toString().slice(0, Franken.unsolicitedPreviewLength);
+            logger.debug(`Unsolicited message from Franken (${unsolicitedMessage.length} bytes): ${JSON.stringify(preview)}`);
+        }
+    }
+    // quiet skips the per-message debug logs, for high-rate polling that would flood the log file
+    async sendMessage(message, quiet = false) {
+        if (!quiet)
+            logger.debug(`Sending message to sock | message: ${message}`);
         let responseBytes;
         try {
             responseBytes = await this.sequentialQueue.exec(async () => {
+                this.logUnsolicitedMessages();
                 const requestBytes = Buffer.concat([Buffer.from(message), Franken.separator]);
                 await this.write(requestBytes);
                 const resp = await this.messageStream.readMessage(FRANKEN_RESPONSE_TIMEOUT_MS);
@@ -58,7 +71,8 @@ export class Franken {
             throw error;
         }
         const response = responseBytes.toString();
-        logger.debug(`Message sent successfully to sock | message: ${message}`);
+        if (!quiet)
+            logger.debug(`Message sent successfully to sock | message: ${message}`);
         return response;
     }
     tryStripNewlines(arg) {
@@ -75,10 +89,10 @@ export class Franken {
         logger.debug(`cleanedArg: ${cleanedArg}`);
         await this.sendMessage(`${commandNumber}\n${cleanedArg}`);
     }
-    async getDeviceStatus(getGestures = false) {
+    async getDeviceStatus(getGestures = false, quiet = false) {
         const command = 'DEVICE_STATUS';
         const commandNumber = frankenCommands[command];
-        const response = await this.sendMessage(commandNumber);
+        const response = await this.sendMessage(commandNumber, quiet);
         return await loadDeviceStatus(response, getGestures);
     }
     close() {
@@ -206,4 +220,4 @@ export async function disconnectFranken() {
     await shutdownFrankenServer();
 }
 //# sourceMappingURL=frankenServer.js.map
-//# debugId=19743398-7780-5bb6-8302-1ea6556da568
+//# debugId=49882277-79b8-5a90-a767-8757444e0f3f

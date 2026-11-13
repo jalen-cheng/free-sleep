@@ -40,6 +40,17 @@ const FIRMWARE_MAP: Record<FirmwareVersion, FirmwareConfig> = {
 };
 
 
+const DEFAULT_GESTURE_POLL_INTERVAL_MS = 500;
+const MIN_GESTURE_POLL_INTERVAL_MS = 100;
+
+// How often to ask Frank for tap counters on Pods with tap support. Override with GESTURE_POLL_INTERVAL_MS.
+function loadGesturePollIntervalMs(): number {
+  const configuredInterval = Number(process.env.GESTURE_POLL_INTERVAL_MS);
+  if (!Number.isFinite(configuredInterval) || configuredInterval <= 0) return DEFAULT_GESTURE_POLL_INTERVAL_MS;
+  return Math.max(MIN_GESTURE_POLL_INTERVAL_MS, configuredInterval);
+}
+
+
 class Config {
   // eslint-disable-next-line no-use-before-define
   private static instance: Config;
@@ -47,6 +58,7 @@ class Config {
   public lowDbFolder: string;
   public remoteDevMode: boolean;
   public dacSockPath: string;
+  public gesturePollIntervalMs: number;
 
   private constructor() {
     if (!process.env.DATA_FOLDER || !process.env.ENV) {
@@ -56,6 +68,7 @@ class Config {
     this.dacSockPath = this.detectSockPath();
     this.dbFolder = process.env.DATA_FOLDER;
     this.lowDbFolder = `${this.dbFolder}lowdb/`;
+    this.gesturePollIntervalMs = loadGesturePollIntervalMs();
   }
 
 

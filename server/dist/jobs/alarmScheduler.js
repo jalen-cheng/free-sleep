@@ -1,5 +1,5 @@
 
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="9255f6d2-cabe-5a5f-9838-091702577fb5")}catch(e){}}();
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="7cc2dff9-d602-5369-a983-09272f81f724")}catch(e){}}();
 import schedule from 'node-schedule';
 import cbor from 'cbor';
 import moment from 'moment-timezone';
@@ -11,6 +11,7 @@ import settingsDB from '../db/settings.js';
 import { executeFunction } from '../8sleep/deviceApi.js';
 import { getDayIndexForSchedule, logJob } from './utils.js';
 import { connectFranken } from '../8sleep/frankenServer.js';
+import { createAlarmSession } from './alarmSession.js';
 export const executeAlarm = async ({ vibrationIntensity, duration, vibrationPattern, side, force = false }) => {
     try {
         const min10Duration = Math.max(10, duration);
@@ -42,15 +43,8 @@ export const executeAlarm = async ({ vibrationIntensity, duration, vibrationPatt
         const command = side === 'left' ? 'ALARM_LEFT' : 'ALARM_RIGHT';
         logger.debug(`Executing alarm... ${JSON.stringify(alarmPayload)}`);
         await executeFunction(command, hexPayload);
-        await memoryDB.read();
-        memoryDB.data[side].isAlarmVibrating = true;
-        await memoryDB.write();
-        setTimeout(async () => {
-            logger.debug('');
-            await memoryDB.read();
-            memoryDB.data[side].isAlarmVibrating = false;
-            await memoryDB.write();
-        }, min10Duration * 1_000);
+        // eslint-disable-next-line no-use-before-define
+        await alarmSession.alarmStarted({ vibrationIntensity, duration, vibrationPattern, side, force }, min10Duration);
         serverStatus.status.alarmSchedule.status = 'healthy';
         serverStatus.status.alarmSchedule.message = '';
     }
@@ -61,6 +55,16 @@ export const executeAlarm = async ({ vibrationIntensity, duration, vibrationPatt
         logger.error(error);
     }
 };
+// Owns the per-side alarm timers (end of vibration, snooze). A snoozed alarm re-runs executeAlarm.
+export const alarmSession = createAlarmSession({
+    startAlarm: executeAlarm,
+    setAlarmVibrating: async (side, isAlarmVibrating) => {
+        await memoryDB.read();
+        memoryDB.data[side].isAlarmVibrating = isAlarmVibrating;
+        await memoryDB.write();
+    },
+    logDebug: message => logger.debug(message),
+});
 /**
  * Next occurrence of HH:mm in tz (today or tomorrow depending on 'now').
  * If the HH:mm is already passed for 'now', schedule for tomorrow.
@@ -148,4 +152,4 @@ export const scheduleAlarm = (settingsData, side, day, dailySchedule) => {
     });
 };
 //# sourceMappingURL=alarmScheduler.js.map
-//# debugId=9255f6d2-cabe-5a5f-9838-091702577fb5
+//# debugId=7cc2dff9-d602-5369-a983-09272f81f724

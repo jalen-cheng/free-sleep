@@ -53,6 +53,11 @@ export class MessageStream {
     }
   }
 
+  // Removes and returns messages that arrived while nothing was waiting for a response.
+  public takeQueuedMessages(): Buffer[] {
+    return this.queue.splice(0, this.queue.length);
+  }
+
   public async readMessage(timeoutMs?: number): Promise<Buffer> {
     // eslint-disable-next-line no-constant-condition
     while (true) {
