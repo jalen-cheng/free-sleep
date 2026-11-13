@@ -22,7 +22,7 @@ export default function TapSettingRow({ gesture, action, children }: TapSettingR
         <Typography variant="body2" sx={ { fontWeight: 500 } }>{ gesture }</Typography>
         <Typography variant="caption" sx={ { color: 'text.secondary' } }>{ action }</Typography>
       </Box>
-      { children && <Box sx={ { display: 'flex', gap: 1, flexShrink: 0 } }>{ children }</Box> }
+      { children && <Box sx={ { display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 } }>{ children }</Box> }
     </Box>
   );
 }
