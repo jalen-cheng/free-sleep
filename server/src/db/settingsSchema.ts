@@ -2,7 +2,8 @@ import { z } from 'zod';
 import { TIME_ZONES } from './timeZones.js';
 import { TimeSchema } from './schedulesSchema.js';
 
-export const TEMPERATURES = ['celsius', 'fahrenheit'] as const;
+// 'level' shows temperatures on Eight Sleep's own -10 to +10 scale. Temperatures are stored in °F whatever is chosen.
+export const TEMPERATURES = ['celsius', 'fahrenheit', 'level'] as const;
 const Temperatures = z.enum(TEMPERATURES);
 
 
@@ -63,3 +64,4 @@ export const SettingsSchema = z.object({
 export type SideSettings = z.infer<typeof SideSettingsSchema>;
 export type Settings = z.infer<typeof SettingsSchema>;
 export type Gesture = z.infer<typeof GestureSchema>
+export type TemperatureFormat = z.infer<typeof Temperatures>

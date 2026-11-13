@@ -7,21 +7,20 @@ import { useDrawingArea } from '@mui/x-charts/hooks';
 
 import { useScheduleStore } from './scheduleStore.tsx';
 import { DailySchedule, Time } from '../../../../server/src/db/schedulesSchema.ts';
-import { useSettings } from '@api/settings.ts';
 import {
-  farenheitToCelcius,
-  formatTemperature,
-  MAX_TEMP_C,
+  TemperatureFormat,
+  formatDisplayValue,
+  getTemperatureUnitLabel,
+  toDisplayValue,
   MAX_TEMP_F,
-  MIN_TEMP_C,
   MIN_TEMP_F
 } from '@lib/temperatureConversions.ts';
+import { useTemperatureFormat } from '@lib/useTemperatureFormat.ts';
 
 
 type Point = { x: Date; y: number };
 
 const THRESHOLD_F = 82;
-const THRESHOLD_C = farenheitToCelcius(THRESHOLD_F);
 const AREA_ALPHA = 0.35;
 const LINE_ALPHA = 1.0;
 
@@ -41,7 +40,7 @@ const compareTime = (a: Time, b: Time) => {
   return ah - bh || am - bm;
 };
 
-function buildSeriesData(selectedSchedule: DailySchedule, yMin: number, yMax: number, isCelsius: boolean): Point[] {
+function buildSeriesData(selectedSchedule: DailySchedule, yMin: number, yMax: number, temperatureFormat: TemperatureFormat): Point[] {
   if (!selectedSchedule?.power.enabled) return [];
 
   const { power, temperatures } = selectedSchedule;
@@ -66,11 +65,11 @@ function buildSeriesData(selectedSchedule: DailySchedule, yMin: number, yMax: nu
 
   const points: Point[] = [{
     x: start,
-    y: isCelsius ? farenheitToCelcius(power.onTemperature) : power.onTemperature
+    y: toDisplayValue(power.onTemperature, temperatureFormat)
   }];
   const pushStep = (arr: [Date, number][]) => {
     for (const [dt, temp] of arr) {
-      const convertedTemp = isCelsius ? farenheitToCelcius(temp) : temp;
+      const convertedTemp = toDisplayValue(temp, temperatureFormat);
 
       if (dt.getTime() > points[points.length - 1].x.getTime()) {
         points.push({ x: dt, y: convertedTemp });
@@ -189,18 +188,18 @@ function HorizontalTempGradient({
 // ---------------- Component ----------------
 export default function TemperatureScheduleChart() {
   const { selectedSchedule } = useScheduleStore();
-  const { data: settings } = useSettings();
   const theme = useTheme();
 
-  const isCelsius = settings?.temperatureFormat === 'celsius';
-  const yMin = isCelsius ? MIN_TEMP_C : MIN_TEMP_F;
-  const yMax = isCelsius ? MAX_TEMP_C : MAX_TEMP_F;
+  const temperatureFormat = useTemperatureFormat();
+  // The chart is drawn in the display unit, so the axis and the color threshold are converted too
+  const yMin = toDisplayValue(MIN_TEMP_F, temperatureFormat);
+  const yMax = toDisplayValue(MAX_TEMP_F, temperatureFormat);
 
   const points = useMemo(() => {
     if (!selectedSchedule) return [];
-    return buildSeriesData(selectedSchedule, yMin, yMax, isCelsius);
+    return buildSeriesData(selectedSchedule, yMin, yMax, temperatureFormat);
   },
-  [selectedSchedule, yMin, yMax, isCelsius],
+  [selectedSchedule, yMin, yMax, temperatureFormat],
   );
 
   if (!points.length) return null;
@@ -222,18 +221,18 @@ export default function TemperatureScheduleChart() {
           max: xData[xData.length - 1],
           tickMinStep: 60 * 60 * 1000,
           tickNumber: 4,
-          label: '°F',
+          label: getTemperatureUnitLabel(temperatureFormat),
           tickLabelStyle: { fill: axisColor },
         }] }
         yAxis={ [{
           min: yMin,
           max: yMax,
           tickLabelStyle: { fill: axisColor },
-          valueFormatter: (value: number) => formatTemperature(value, isCelsius) ,
+          valueFormatter: (value: number) => formatDisplayValue(value, temperatureFormat),
         }] }
         series={ [{
           id: 'targeTempF',
-          label: isCelsius ? 'Target °C' : 'Target °F',
+          label: `Target ${getTemperatureUnitLabel(temperatureFormat).toLowerCase()}`,
           data: yData,
           area: true,
           showMark: false,
@@ -271,7 +270,7 @@ export default function TemperatureScheduleChart() {
           idArea={ gradAreaId }
           idLine={ gradLineId }
           points={ points }
-          threshold={ isCelsius ? THRESHOLD_C : THRESHOLD_F }
+          threshold={ toDisplayValue(THRESHOLD_F, temperatureFormat) }
           colorCool="#2196f3"
           colorHot="#d32f2f"
           areaAlpha={ AREA_ALPHA }

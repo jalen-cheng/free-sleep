@@ -1,9 +1,10 @@
 
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="db39d296-3006-596f-ac6f-ecb70407ce0c")}catch(e){}}();
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="a88bec02-fe01-5b30-9340-8f94e3d3b249")}catch(e){}}();
 import { z } from 'zod';
 import { TIME_ZONES } from './timeZones.js';
 import { TimeSchema } from './schedulesSchema.js';
-export const TEMPERATURES = ['celsius', 'fahrenheit'];
+// 'level' shows temperatures on Eight Sleep's own -10 to +10 scale. Temperatures are stored in °F whatever is chosen.
+export const TEMPERATURES = ['celsius', 'fahrenheit', 'level'];
 const Temperatures = z.enum(TEMPERATURES);
 const TemperatureTapConfig = z.object({
     type: z.literal('temperature'),
@@ -54,4 +55,4 @@ export const SettingsSchema = z.object({
     rebootDaily: z.boolean(),
 }).strict();
 //# sourceMappingURL=settingsSchema.js.map
-//# debugId=db39d296-3006-596f-ac6f-ecb70407ce0c
+//# debugId=a88bec02-fe01-5b30-9340-8f94e3d3b249

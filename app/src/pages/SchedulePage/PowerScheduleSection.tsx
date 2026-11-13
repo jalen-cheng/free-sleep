@@ -1,12 +1,14 @@
 import { Box, InputAdornment, Paper, Slider, TextField, Typography } from '@mui/material';
 import { useAppStore } from '@state/appStore.tsx';
 import { useScheduleStore } from './scheduleStore.tsx';
-import { formatTemperature, getTemperatureColor, MAX_TEMP_F, MIN_TEMP_F } from '@lib/temperatureConversions.ts';
+import {
+  TemperatureFormat, describeTemperature, formatTemperature, getTemperatureColor, snapTemperature, MAX_TEMP_F, MIN_TEMP_F,
+} from '@lib/temperatureConversions.ts';
 import PowerOffTime from './PowerOffTime.tsx';
 import AccessTime from '@mui/icons-material/AccessTime';
 import { useTheme } from '@mui/material/styles';
 
-export default function PowerScheduleSection({ displayCelsius }: { displayCelsius: boolean }) {
+export default function PowerScheduleSection({ temperatureFormat }: { temperatureFormat: TemperatureFormat }) {
   const { isUpdating } = useAppStore();
   const theme = useTheme();
   const { selectedSchedule, updateSelectedSchedule } = useScheduleStore();
@@ -53,7 +55,7 @@ export default function PowerScheduleSection({ displayCelsius }: { displayCelsiu
       <Box sx={ { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0, flex: 1, pr: 1 } }>
         { /* Temperature label */ }
         <Typography variant="body2" sx={ { color: 'text.primary', mb: 0, textAlign: 'center' } }>
-          { `Power on temperature ${formatTemperature(selectedSchedule?.power?.onTemperature || 82, displayCelsius)}` }
+          { `Power on temperature ${describeTemperature(onTemperatureValue, temperatureFormat)}` }
         </Typography>
         <Slider
           value={ onTemperatureValue }
@@ -61,8 +63,8 @@ export default function PowerScheduleSection({ displayCelsius }: { displayCelsiu
           onChange={ (_, newValue) => {
             updateSelectedSchedule({
               power: {
-                // @ts-ignore
-                onTemperature: newValue
+                // Snapped so that, in levels, the slider only stops on whole levels
+                onTemperature: snapTemperature(newValue as number, temperatureFormat)
               }
             });
           } }
@@ -70,8 +72,8 @@ export default function PowerScheduleSection({ displayCelsius }: { displayCelsiu
           max={ MAX_TEMP_F }
           step={ 1 }
           marks={ [
-            { value: MIN_TEMP_F, label: formatTemperature(MIN_TEMP_F, displayCelsius) },
-            { value: MAX_TEMP_F, label: formatTemperature(MAX_TEMP_F, displayCelsius) },
+            { value: MIN_TEMP_F, label: formatTemperature(MIN_TEMP_F, temperatureFormat) },
+            { value: MAX_TEMP_F, label: formatTemperature(MAX_TEMP_F, temperatureFormat) },
           ] }
           disabled={ disabled }
           sx={ {

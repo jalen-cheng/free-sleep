@@ -4,7 +4,7 @@ import { useSchedules } from '@api/schedules.ts';
 import { useSettings } from '@api/settings.ts';
 import { useAppStore } from '@state/appStore.tsx';
 import { DayOfWeek } from '@api/schedulesSchema.ts';
-import { formatTemperature } from '@lib/temperatureConversions.ts';
+import { TemperatureFormat, describeTemperature, getTemperatureParts } from '@lib/temperatureConversions.ts';
 
 type TemperatureLabelProps = {
   isOn: boolean;
@@ -12,22 +12,24 @@ type TemperatureLabelProps = {
   sliderColor: string;
   currentTargetTemp: number;
   currentTemperatureF: number;
-  displayCelsius: boolean;
+  temperatureFormat: TemperatureFormat;
 };
 
 export default function TemperatureLabel({
-  isOn, sliderTemp, sliderColor, currentTargetTemp, currentTemperatureF, displayCelsius,
+  isOn, sliderTemp, sliderColor, currentTargetTemp, currentTemperatureF, temperatureFormat,
 }: TemperatureLabelProps) {
   const { side } = useAppStore();
   const { data: schedules } = useSchedules();
   const { data: settings } = useSettings();
   const currentDay = settings?.timeZone && moment.tz(settings.timeZone).format('dddd').toLowerCase() as DayOfWeek;
   const power = currentDay ? schedules?.[side]?.[currentDay]?.power : undefined;
-  const temperature = formatTemperature(sliderTemp, displayCelsius);
+  const temperature = getTemperatureParts(sliderTemp, temperatureFormat);
   const isAdjusting = sliderTemp !== currentTargetTemp;
   let targetLabel = '';
   if (sliderTemp < currentTemperatureF) targetLabel = isAdjusting ? 'Cool to' : 'Cooling to';
   if (sliderTemp > currentTemperatureF) targetLabel = isAdjusting ? 'Warm to' : 'Warming to';
+  // A bare "+1" needs saying what it is; degrees carry their own unit
+  if (temperatureFormat === 'level') targetLabel = targetLabel ? `${targetLabel} level` : 'Level';
 
   return (
     <Box sx={ { textAlign: 'center', whiteSpace: 'nowrap', pointerEvents: 'none' } }>
@@ -41,9 +43,9 @@ export default function TemperatureLabel({
       >
         { isOn ? (
           <>
-            { temperature.split('°')[0] }
+            { temperature.value }
             <Box component="span" sx={ { fontSize: 27, verticalAlign: 'top', lineHeight: 2 } }>
-              °{ displayCelsius ? 'C' : 'F' }
+              { temperature.unit }
             </Box>
           </>
         ) : 'Off' }
@@ -52,7 +54,7 @@ export default function TemperatureLabel({
         <Box sx={ { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.75 } }>
           <Box component="span" sx={ { width: 5, height: 5, borderRadius: '50%', bgcolor: sliderColor } }/>
           <Typography variant="caption" sx={ { color: 'text.secondary' } }>
-            Currently at { formatTemperature(currentTemperatureF, displayCelsius) }
+            Currently at { describeTemperature(currentTemperatureF, temperatureFormat) }
           </Typography>
         </Box>
       ) }

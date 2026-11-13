@@ -9,20 +9,17 @@ import { useDeviceStatus } from '@api/deviceStatus.ts';
 import { Version } from '@api/deviceStatusSchema.ts';
 import { Settings } from '@api/settingsSchema.ts';
 import { useAppStore } from '@state/appStore.tsx';
-import { formatTemperatureDelta } from '@lib/temperatureConversions.ts';
+import { formatTemperatureDelta, getStepOptions, snapStep } from '@lib/temperatureConversions.ts';
 import Section from '../Section.tsx';
 import TapSettingRow from './TapSettingRow.tsx';
-import {
-  MAX_TEMPERATURE_STEP_F, MIN_TEMPERATURE_STEP_F, SharedTapSettings, buildSideTaps, readSharedTapSettings,
-} from './tapSettings.ts';
+import { SharedTapSettings, buildSideTaps, readSharedTapSettings } from './tapSettings.ts';
 
-const TEMPERATURE_STEPS_F = _.range(MIN_TEMPERATURE_STEP_F, MAX_TEMPERATURE_STEP_F + 1);
 const SNOOZE_MINUTES = _.range(1, 11);
 const SECONDS_PER_MINUTE = 60;
 
 // The section sets `overflow-wrap: anywhere`, which would otherwise break button labels mid-word
 const toggleGroupSx = { '& .MuiToggleButton-root': { flex: 1, py: 0.5, px: 1.5, whiteSpace: 'nowrap' } };
-const selectSx = { width: 104, flexShrink: 0 };
+const selectSx = { width: 112, flexShrink: 0 };
 
 type TapGesturesSectionProps = {
   settings?: Settings;
@@ -37,7 +34,7 @@ export default function TapGesturesSection({ settings, updateSettings }: TapGest
   const { isUpdating } = useAppStore();
   if (!settings || !deviceStatus || deviceStatus.coverVersion === Version.Pod3) return null;
 
-  const displayCelsius = settings.temperatureFormat === 'celsius';
+  const temperatureFormat = settings.temperatureFormat;
   // Both sides are kept the same, so either side can be read
   const tapSettings = readSharedTapSettings(settings.left.taps);
 
@@ -53,14 +50,14 @@ export default function TapGesturesSection({ settings, updateSettings }: TapGest
           <TextField
             select
             size="small"
-            value={ tapSettings.temperatureStepF }
+            value={ snapStep(tapSettings.temperatureStepF, temperatureFormat) }
             onChange={ (event) => saveTapSettings({ temperatureStepF: Number(event.target.value) }) }
             disabled={ isUpdating }
             sx={ selectSx }
             slotProps={ { htmlInput: { 'aria-label': 'Temperature step' } } }
           >
-            { TEMPERATURE_STEPS_F.map(stepF => (
-              <MenuItem key={ stepF } value={ stepF }>{ formatTemperatureDelta(stepF, displayCelsius) }</MenuItem>
+            { getStepOptions(temperatureFormat).map(stepF => (
+              <MenuItem key={ stepF } value={ stepF }>{ formatTemperatureDelta(stepF, temperatureFormat) }</MenuItem>
             )) }
           </TextField>
         </TapSettingRow>

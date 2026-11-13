@@ -3,6 +3,7 @@ import LinkIcon from '@mui/icons-material/Link';
 import LinkOffIcon from '@mui/icons-material/LinkOff';
 import { useAppStore } from '@state/appStore.tsx';
 import { useSettings } from '@api/settings.ts';
+import { useTemperatureFormat } from '@lib/useTemperatureFormat.ts';
 import { useDeviceStatus } from '@api/deviceStatus.ts';
 import { formatTemperature } from '@lib/temperatureConversions.ts';
 
@@ -19,7 +20,7 @@ export default function SideControl({ showTemp, linkedHint, onLinkSidesChange }:
   const { side, setSide, linkSides, setLinkSides, isUpdating } = useAppStore();
   const { data: settings } = useSettings();
   const { data: deviceStatus } = useDeviceStatus();
-  const isCelsius = settings?.temperatureFormat === 'celsius';
+  const temperatureFormat = useTemperatureFormat();
 
   const handleLinkToggle = () => {
     const nextLinkSides = !linkSides;
@@ -48,7 +49,7 @@ export default function SideControl({ showTemp, linkedHint, onLinkSidesChange }:
                 </Typography>
                 { showTemp && side !== bedSide && (
                   <Typography component="span" variant="caption" sx={ { color: 'text.secondary', flexShrink: 0 } }>
-                    { deviceStatus?.[bedSide]?.isOn ? formatTemperature(deviceStatus[bedSide].targetTemperatureF, isCelsius) : 'Off' }
+                    { deviceStatus?.[bedSide]?.isOn ? formatTemperature(deviceStatus[bedSide].targetTemperatureF, temperatureFormat) : 'Off' }
                   </Typography>
                 ) }
               </Box>
