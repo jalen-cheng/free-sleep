@@ -58,6 +58,7 @@ The Eight Sleep column is from memory and public material, not from testing the 
 ## Checklist for the first day on the Pod
 
 In order. Stop and note the output if a step does not behave as described.
+The full walkthrough, with every command and what to expect, is in [POD5_FIRST_DAY.md](POD5_FIRST_DAY.md).
 
 ### Before opening it
 - [ ] Pod 5 is already set up in the Eight Sleep app (required before install).

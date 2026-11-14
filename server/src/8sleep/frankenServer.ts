@@ -106,6 +106,12 @@ export class Franken {
     return await loadDeviceStatus(response, getGestures);
   }
 
+  // The firmware's status reply exactly as sent, before any fields are picked out of it.
+  // For debugging on hardware the parser was not written for, where it may carry fields we ignore.
+  public async getRawDeviceStatus(): Promise<string> {
+    return await this.sendMessage(frankenCommands.DEVICE_STATUS, true);
+  }
+
   public close() {
     const socket = this.socket;
     if (!socket.destroyed) socket.destroy();

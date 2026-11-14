@@ -1,5 +1,5 @@
 
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="49882277-79b8-5a90-a767-8757444e0f3f")}catch(e){}}();
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="8ff738cc-9ee7-5eba-b03d-b31d32b2c1c0")}catch(e){}}();
 import { SequentialQueue } from './sequentialQueue.js';
 import { MessageReadTimeoutError, MessageStream } from './messageStream.js';
 import { frankenCommands } from './deviceApi.js';
@@ -94,6 +94,11 @@ export class Franken {
         const commandNumber = frankenCommands[command];
         const response = await this.sendMessage(commandNumber, quiet);
         return await loadDeviceStatus(response, getGestures);
+    }
+    // The firmware's status reply exactly as sent, before any fields are picked out of it.
+    // For debugging on hardware the parser was not written for, where it may carry fields we ignore.
+    async getRawDeviceStatus() {
+        return await this.sendMessage(frankenCommands.DEVICE_STATUS, true);
     }
     close() {
         const socket = this.socket;
@@ -220,4 +225,4 @@ export async function disconnectFranken() {
     await shutdownFrankenServer();
 }
 //# sourceMappingURL=frankenServer.js.map
-//# debugId=49882277-79b8-5a90-a767-8757444e0f3f
+//# debugId=8ff738cc-9ee7-5eba-b03d-b31d32b2c1c0
