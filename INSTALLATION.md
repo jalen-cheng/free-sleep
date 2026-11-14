@@ -271,6 +271,7 @@ sh /home/dac/free-sleep/scripts/block_internet_access.sh
 ```
 
 - Blocks all traffic leaving your local network. LAN access (the Free Sleep site, SSH) and NTP time sync keep working.
+- DNS lookups (port 53) are allowed to any resolver, so the Pod can find the time servers even when your network hands out public DNS servers.
 - The rules are saved and restored on every boot by the `free-sleep-firewall` systemd service, and are re-applied after Free Sleep updates.
 - Running the script again is safe; it replaces the existing rules instead of adding duplicates.
 - Sentry (error logging) servers are **blocked** by default. If you want to send error logs, allow them with

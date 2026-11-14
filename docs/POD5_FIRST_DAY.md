@@ -17,6 +17,11 @@ so paste the actual output rather than a summary.
   tag-connect footprint is. They are worth adding to this repo.
 - The install commands are the same for Pod 4 and Pod 5 according to INSTALLATION.md.
 - How the Pod 5's three side buttons are reported is unknown. Part 4 finds out.
+- **A newer Pod 5 bootloader may block the install.** Upstream
+  [issue #66](https://github.com/throwaway31265/free-sleep/issues/66) (open, no answer yet)
+  reports a Pod 5 whose bootloader, built in March 2025, never shows the
+  `Hit any key to stop autoboot` prompt, so root access cannot be gained this way. Part 2 step 4
+  says what to look for and what to do if yours is the same.
 
 ## Part 0: before you start
 
@@ -68,6 +73,12 @@ The Pod stays unplugged until step 4.
 4. **Plug the Pod's power in** and watch the terminal. When `Hit any key to stop autoboot`
    appears, press Ctrl+C at once. You have a couple of seconds. If you miss it, unplug the Pod,
    wait ten seconds, and try again.
+   - **The boot log scrolls past with no `Hit any key` line, and it reaches `eight-pod login:`.**
+     Your bootloader is the kind described in upstream issue #66. Do not keep power-cycling.
+     Record the `U-Boot 20xx.xx ... (date)` line and the `Welcome to Eight Layer` line from the
+     log, try holding Ctrl+C from before the power goes in once more, and if it still does not
+     stop, close the Pod up: the rest of this walkthrough cannot be done until there is a way in.
+     The Pod is unchanged and still works with the Eight Sleep app.
    - Nothing printed at all: transmit and receive are probably swapped. Unplug the Pod, swap
      those two wires, retry.
    - Garbage characters: the speed is wrong. It must be 921600.
@@ -235,7 +246,14 @@ From the UI on your phone.
 4. **Schedule.** Create a schedule for today that powers on three minutes from now, save it,
    turn the side off, and wait. Record whether it turned on at the right minute.
 5. **Alarm.** Set an alarm for three minutes from now. When it vibrates:
-   - Does the Dismiss button in the app stop it?
+   - Does the Dismiss button in the app stop it, or does the bed keep vibrating after the dialog closes?
+     Upstream [issue #54](https://github.com/throwaway31265/free-sleep/issues/54) found that on a
+     Pod 3 the dismiss command does nothing to an alarm that is already vibrating. If yours keeps
+     vibrating, try this while it is going and record whether it stops within a few seconds
+     (use the side that is vibrating):
+     ```
+     curl -s -X POST localhost:3000/api/alarm -H 'Content-Type: application/json' -d '{"side":"left","vibrationIntensity":1,"vibrationPattern":"double","duration":1}'
+     ```
    - Run it again with alarms on both sides: does dismissing one side stop the other?
    - Run it once more: does turning the side off stop the vibration?
 6. **Alarm from the bed.** Only if Part 4 showed the buttons reach Free Sleep: press the button
@@ -249,7 +267,14 @@ From the UI on your phone.
    du -sh /persistent/free-sleep-data/logs
    ```
    Record the CPU share of the `node` process and the log size.
-2. Run an update and confirm the block survives it:
+2. Check free space now and again the next day. Upstream
+   [issue #53](https://github.com/throwaway31265/free-sleep/issues/53) found old sensor capture
+   files filling this partition within days on a Pod 3, which stops Free Sleep from starting.
+   ```
+   df -h /persistent
+   ls /persistent/*.RAW 2>/dev/null | wc -l
+   ```
+3. Run an update and confirm the block survives it:
    ```
    fs-update
    cat /etc/free-sleep/update_source.conf
