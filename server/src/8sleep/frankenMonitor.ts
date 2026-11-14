@@ -3,20 +3,12 @@ import logger from '../logger.js';
 import settingsDB from '../db/settings.js';
 import { connectFranken } from './frankenServer.js';
 import { wait } from './promises.js';
-import {
-  DeviceStatus,
-  MAX_TARGET_TEMPERATURE_F,
-  MIN_TARGET_TEMPERATURE_F,
-  Version,
-} from '../routes/deviceStatus/deviceStatusSchema.js';
+import { DeviceStatus, Version } from '../routes/deviceStatus/deviceStatusSchema.js';
 import { Side } from '../db/schedulesSchema.js';
 import { GestureSchema } from '../db/settingsSchema.js';
-import { countNewGestures, processSideGestures } from './gestures.js';
+import { countNewGestures } from './gestures.js';
+import { runSideGestures } from './gestureActions.js';
 import config from '../config.js';
-import { handleAlarmGesture } from '../jobs/alarmSession.js';
-import { alarmSession } from '../jobs/alarmScheduler.js';
-import { updateDeviceStatus } from '../routes/deviceStatus/updateDeviceStatus.js';
-import { DeepPartial } from 'ts-essentials';
 import serverStatus from '../serverStatus.js';
 
 const SIDES: Side[] = ['left', 'right'];
@@ -54,38 +46,6 @@ export class FrankenMonitor {
     this.isRunning = false;
   }
 
-  // Runs the configured actions for every tap gesture a side made since the last poll.
-  private async processGesturesForSide(nextDeviceStatus: DeviceStatus, side: Side) {
-    try {
-      await processSideGestures({
-        previousTaps: this.deviceStatus?.[side].taps,
-        nextTaps: nextDeviceStatus[side].taps,
-        tapSettings: settingsDB.data[side].taps,
-        targetTemperatureF: nextDeviceStatus[side].targetTemperatureF,
-        temperatureLimits: { minTemperatureF: MIN_TARGET_TEMPERATURE_F, maxTemperatureF: MAX_TARGET_TEMPERATURE_F },
-        actions: {
-          setTargetTemperature: async (temperatureF) => {
-            logger.debug(`Processing gesture temperature change for ${side} -> ${temperatureF}`);
-            await updateDeviceStatus({ [side]: { targetTemperatureF: temperatureF } } as DeepPartial<DeviceStatus>);
-          },
-          runAlarmGesture: async (tapConfig) => {
-            const result = await handleAlarmGesture(tapConfig, {
-              isAlarmVibrating: nextDeviceStatus[side].isAlarmVibrating,
-              isSideOn: nextDeviceStatus[side].isOn,
-              // Same paths the app uses to dismiss an alarm and for its power button
-              dismissAlarm: () => updateDeviceStatus({ [side]: { isAlarmVibrating: false } } as DeepPartial<DeviceStatus>),
-              snoozeAlarm: snoozeSeconds => alarmSession.snooze(side, snoozeSeconds),
-              setPower: isOn => updateDeviceStatus({ [side]: { isOn } } as DeepPartial<DeviceStatus>),
-            });
-            logger.debug(`Processed alarm gesture for ${side}: ${result}`);
-          },
-        },
-      });
-    } catch (error) {
-      logger.error(error);
-    }
-  }
-
   // True when any tap counter moved forward, so settings are only read from disk when needed.
   private hasNewGestures(nextDeviceStatus: DeviceStatus) {
     return SIDES.some(side => GestureSchema.options.some(gesture => (
@@ -102,7 +62,7 @@ export class FrankenMonitor {
 
     await settingsDB.read();
     for (const side of SIDES) {
-      await this.processGesturesForSide(nextDeviceStatus, side);
+      await runSideGestures(side, nextDeviceStatus, this.deviceStatus[side].taps, nextDeviceStatus[side].taps);
     }
   }
 

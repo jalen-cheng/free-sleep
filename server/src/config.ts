@@ -59,6 +59,8 @@ class Config {
   public remoteDevMode: boolean;
   public dacSockPath: string;
   public gesturePollIntervalMs: number;
+  // systemd unit whose journal carries Eight Sleep's firmware log (read for Pod 5 button presses)
+  public firmwareLogUnit: string;
 
   private constructor() {
     if (!process.env.DATA_FOLDER || !process.env.ENV) {
@@ -69,6 +71,7 @@ class Config {
     this.dbFolder = process.env.DATA_FOLDER;
     this.lowDbFolder = `${this.dbFolder}lowdb/`;
     this.gesturePollIntervalMs = loadGesturePollIntervalMs();
+    this.firmwareLogUnit = process.env.FIRMWARE_LOG_UNIT || 'frank';
   }
 
 

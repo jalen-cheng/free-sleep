@@ -26,14 +26,30 @@ type TapGesturesSectionProps = {
   updateSettings: (settings: DeepPartial<Settings>) => void;
 }
 
-// What tapping the side of the bed does. One set of choices, applied to both sides.
-// The Pod only reports double, triple and quadruple taps, so those are the three gestures.
+// The wording for each control. A Pod 4 cover counts taps; a Pod 5 cover has three buttons per
+// side, and each button uses the settings of the tap gesture that does the same job.
+const TAP_LABELS = {
+  title: 'Tap gestures',
+  temperature: 'Double tap / triple tap',
+  duringAlarm: 'Quadruple tap during an alarm',
+  otherwise: 'Quadruple tap at other times',
+};
+const BUTTON_LABELS: typeof TAP_LABELS = {
+  title: 'Side buttons',
+  temperature: '− button / + button',
+  duringAlarm: 'Middle button during an alarm',
+  otherwise: 'Middle button at other times',
+};
+
+// What the controls on the side of the bed do. One set of choices, applied to both sides.
 // Pod 3 covers have no tap sensors.
 export default function TapGesturesSection({ settings, updateSettings }: TapGesturesSectionProps) {
   const { data: deviceStatus } = useDeviceStatus();
   const { isUpdating } = useAppStore();
   if (!settings || !deviceStatus || deviceStatus.coverVersion === Version.Pod3) return null;
 
+  const hasButtons = deviceStatus.coverVersion === Version.Pod5;
+  const labels = hasButtons ? BUTTON_LABELS : TAP_LABELS;
   const temperatureFormat = settings.temperatureFormat;
   // Both sides are kept the same, so either side can be read
   const tapSettings = readSharedTapSettings(settings.left.taps);
@@ -44,9 +60,9 @@ export default function TapGesturesSection({ settings, updateSettings }: TapGest
   };
 
   return (
-    <Section title="Tap gestures" icon={ <TouchAppOutlinedIcon/> }>
+    <Section title={ labels.title } icon={ <TouchAppOutlinedIcon/> }>
       <Box sx={ { display: 'flex', flexDirection: 'column', gap: 2 } }>
-        <TapSettingRow gesture="Double tap / triple tap" action="Cooler / warmer, by this much">
+        <TapSettingRow gesture={ labels.temperature } action="Cooler / warmer, by this much">
           <TextField
             select
             size="small"
@@ -62,7 +78,7 @@ export default function TapGesturesSection({ settings, updateSettings }: TapGest
           </TextField>
         </TapSettingRow>
         <Divider/>
-        <TapSettingRow gesture="Quadruple tap during an alarm" action="Stops the alarm, or snoozes it">
+        <TapSettingRow gesture={ labels.duringAlarm } action="Stops the alarm, or snoozes it">
           <ToggleButtonGroup
             disabled={ isUpdating }
             size="small"
@@ -71,7 +87,7 @@ export default function TapGesturesSection({ settings, updateSettings }: TapGest
             onChange={ (_event, alarmBehavior: SharedTapSettings['alarmBehavior'] | null) => {
               if (alarmBehavior !== null) saveTapSettings({ alarmBehavior });
             } }
-            aria-label="Quadruple tap during an alarm"
+            aria-label={ labels.duringAlarm }
             sx={ { ...toggleGroupSx, flex: 1 } }
           >
             <ToggleButton value="dismiss">Dismiss</ToggleButton>
@@ -94,7 +110,7 @@ export default function TapGesturesSection({ settings, updateSettings }: TapGest
           ) }
         </TapSettingRow>
         <Divider/>
-        <TapSettingRow gesture="Quadruple tap at other times" action="When no alarm is going off">
+        <TapSettingRow gesture={ labels.otherwise } action={ hasButtons ? 'A short press, when no alarm is going off' : 'When no alarm is going off' }>
           <ToggleButtonGroup
             disabled={ isUpdating }
             size="small"
@@ -103,13 +119,19 @@ export default function TapGesturesSection({ settings, updateSettings }: TapGest
             onChange={ (_event, inactiveAlarmBehavior: SharedTapSettings['inactiveAlarmBehavior'] | null) => {
               if (inactiveAlarmBehavior !== null) saveTapSettings({ inactiveAlarmBehavior });
             } }
-            aria-label="Quadruple tap when no alarm is going off"
+            aria-label={ labels.otherwise }
             sx={ { ...toggleGroupSx, flex: 1 } }
           >
             <ToggleButton value="power">Turn side on / off</ToggleButton>
             <ToggleButton value="none">Do nothing</ToggleButton>
           </ToggleButtonGroup>
         </TapSettingRow>
+        { hasButtons && (
+          <>
+            <Divider/>
+            <TapSettingRow gesture="Hold the middle button" action="Two seconds or more turns that side on or off"/>
+          </>
+        ) }
       </Box>
     </Section>
   );

@@ -16,9 +16,10 @@ so paste the actual output rather than a summary.
   closest guide. **Take photos as you open the Pod 5**, especially of the board and where the
   tag-connect footprint is. They are worth adding to this repo.
 - The install commands are the same for Pod 4 and Pod 5 according to INSTALLATION.md.
-- Other Pod 5 owners report that the + and - buttons do nothing under Free Sleep, and that the
-  firmware writes each press to its own log instead of the tap counters. Part 4 confirms this on
-  your Pod.
+- Other Pod 5 owners report that the + and - buttons do nothing under upstream Free Sleep, and
+  that the firmware writes each press to its own log instead of the tap counters. This fork now
+  reads that log, but the reader was written from their reports and has never seen a real Pod.
+  Part 4 checks it against yours.
 - **A newer Pod 5 bootloader may block the install.** Upstream
   [issue #66](https://github.com/throwaway31265/free-sleep/issues/66) (open, no answer yet)
   reports a Pod 5 whose bootloader, built in March 2025, never shows the
@@ -205,8 +206,17 @@ What the result means:
 | Nothing changes anywhere | Free Sleep currently sees nothing from the buttons. Keep the status files and stop here. |
 | Hold or double press looks different from a single press | Holds can be given their own action. |
 
-Also check whether the buttons changed the temperature on their own, with no Free Sleep action,
-by watching the dial in the UI while you press + and -.
+Then check the fork's button reader. With the UI open on your phone:
+
+- Press + twice and - once. The target should move by your step size each time, within a second or two.
+- Hold the middle button for a full two seconds. That side should switch off; hold again and it should switch on.
+- Look for the reader's own lines, which show what it understood:
+  ```
+  grep -i "button" /persistent/free-sleep-data/logs/*.log | tail -20
+  ```
+  Expect `Button monitor started` once, and a `Button press:` line per press. If the firmware
+  log showed presses in step 3 but there are no `Button press:` lines, the line format differs
+  from the reports; the lines you recorded are what is needed to fix it.
 
 ## Part 5: block the internet
 
