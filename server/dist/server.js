@@ -1,11 +1,12 @@
 
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="29364e05-57b8-52f6-89dd-72009ad15e54")}catch(e){}}();
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="4f53117c-eb0b-5c5d-a398-f076dab3f4bd")}catch(e){}}();
 import './instrument.js';
 import express from 'express';
 import schedule from 'node-schedule';
 import logger from './logger.js';
 import { connectFranken, disconnectFranken } from './8sleep/frankenServer.js';
 import { FrankenMonitor } from './8sleep/frankenMonitor.js';
+import { ButtonMonitor } from './8sleep/buttonMonitor.js';
 import './jobs/jobScheduler.js';
 // Setup code
 import setupMiddleware from './setup/middleware.js';
@@ -19,6 +20,7 @@ const port = 3000;
 const app = express();
 let server;
 let frankenMonitor;
+let buttonMonitor;
 async function disconnectPrisma() {
     try {
         logger.debug('Flushing SQLite');
@@ -66,6 +68,7 @@ async function gracefulShutdown(signal) {
         }
         if (!config.remoteDevMode) {
             frankenMonitor?.stop();
+            buttonMonitor?.stop();
             await disconnectFranken();
             logger.debug('Successfully closed Franken components.');
         }
@@ -91,6 +94,9 @@ const initFrankenMonitor = () => {
     serverStatus.status.frankenMonitor.status = 'started';
     frankenMonitor = new FrankenMonitor();
     void frankenMonitor.start();
+    // Pod 5 buttons are read from the firmware log; on other Pods this starts nothing
+    buttonMonitor = new ButtonMonitor();
+    buttonMonitor.start().catch(error => logger.error(error));
     logger.info('Frank monitor started!');
 };
 // Main startup function
@@ -139,4 +145,4 @@ startServer().catch((err) => {
     process.exit(1);
 });
 //# sourceMappingURL=server.js.map
-//# debugId=29364e05-57b8-52f6-89dd-72009ad15e54
+//# debugId=4f53117c-eb0b-5c5d-a398-f076dab3f4bd
