@@ -9,6 +9,7 @@ with unit tests and the demo UI only.
 - [Changes by pull request](#changes-by-pull-request)
 - [Compared with the Eight Sleep app](#compared-with-the-eight-sleep-app)
 - [Checklist for the first day on the Pod](#checklist-for-the-first-day-on-the-pod)
+- [Upstream issues that touch this fork](#upstream-issues-that-touch-this-fork)
 - [Later](#later)
 
 ## Changes by pull request
@@ -111,6 +112,20 @@ The full walkthrough, with every command and what to expect, is in [POD5_FIRST_D
 - [ ] `uname -m` (processor type) and `df -h /persistent` (free space).
 - [ ] `ls /dev/net/tun` (tunnel device).
 - [ ] `iptables -m owner --help | tail -5` (per-program firewall rules).
+
+## Upstream issues that touch this fork
+
+From the upstream issue tracker and open pull requests, checked 2026-11-13.
+
+| Upstream | What it says | Effect here |
+|---|---|---|
+| [#66](https://github.com/throwaway31265/free-sleep/issues/66) | A Pod 5 with a March 2025 bootloader shows no autoboot prompt, so the serial install cannot start. Open, unanswered. | May block the install entirely. The walkthrough says what to look for. |
+| [#54](https://github.com/throwaway31265/free-sleep/issues/54) | On a Pod 3, the dismiss command does not stop an alarm that is already vibrating. Sending a new one-second alarm does. Untested on Pod 4/5. | Dismiss from the app and from the bed both use that command. If the Pod 5 behaves the same, dismiss and snooze need the one-second-alarm method instead. |
+| [#53](https://github.com/throwaway31265/free-sleep/issues/53) | Old `.RAW` sensor files fill `/persistent` within days on a Pod 3 and stop Free Sleep from starting. | Unknown on Pod 5, which stores sensor data differently. Free space is on the checklist. |
+| [PR 51](https://github.com/throwaway31265/free-sleep/pull/51), [PR 60](https://github.com/throwaway31265/free-sleep/pull/60) | With the block on, the clock stopped syncing on a network whose DNS servers were public addresses, because DNS was blocked. | Fixed here the same way: DNS is allowed to any resolver. This fork's rules already cover the other findings in PR 60 (IPv6 neighbor discovery, and removing Sentry rules when it is switched back off). |
+| [#62](https://github.com/throwaway31265/free-sleep/issues/62), [#63](https://github.com/throwaway31265/free-sleep/issues/63) | On some Pod 4s the installer cannot find the firmware socket path and the server silently uses the Pod 3 path. | Not changed here. If the UI stays greyed out with the cover connected, check `fs-debug` for the socket path. |
+
+The project's Discord has not been checked.
 
 ## Later
 

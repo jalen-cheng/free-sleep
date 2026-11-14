@@ -1,5 +1,5 @@
 #!/bin/bash
-# Blocks WAN access for the Pod, keeps LAN + NTP working, and makes the block survive reboots.
+# Blocks WAN access for the Pod, keeps LAN + NTP (and the DNS lookups NTP needs) working, and makes the block survive reboots.
 #
 # Options (environment variables, remembered for later runs such as the re-block after an update):
 #   ALLOW_SENTRY=true      Allow error logs to reach Sentry's ingestion servers (default: blocked)
@@ -44,6 +44,12 @@ build_ipv4_rules() {
   # NTP keeps the system clock (and therefore schedules) correct
   echo "-A INPUT -p udp --sport 123 -j ACCEPT"
   echo "-A OUTPUT -p udp --dport 123 -j ACCEPT"
+  # DNS, so the time servers above can be looked up by name. Allowed to any resolver: some
+  # networks hand out public DNS servers, which the LAN ranges below would not cover.
+  for dns_protocol in udp tcp; do
+    echo "-A OUTPUT -p $dns_protocol --dport 53 -j ACCEPT"
+    echo "-A INPUT -p $dns_protocol --sport 53 -j ACCEPT"
+  done
   # DHCP: address requests are broadcast, so the LAN ranges below do not cover them.
   # Without this the Pod could fail to get an address and drop off the network.
   echo "-A OUTPUT -p udp --sport 68 --dport 67 -j ACCEPT"
@@ -74,6 +80,10 @@ build_ipv6_rules() {
   echo ":OUTPUT ACCEPT [0:0]"
   echo "-A INPUT -p udp --sport 123 -j ACCEPT"
   echo "-A OUTPUT -p udp --dport 123 -j ACCEPT"
+  for dns_protocol in udp tcp; do
+    echo "-A OUTPUT -p $dns_protocol --dport 53 -j ACCEPT"
+    echo "-A INPUT -p $dns_protocol --sport 53 -j ACCEPT"
+  done
   echo "-A INPUT -i lo -j ACCEPT"
   echo "-A OUTPUT -o lo -j ACCEPT"
   for private_range in $PRIVATE_IPV6_RANGES; do
