@@ -1,17 +1,15 @@
 
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="7a486643-87b4-56b8-bec7-2d7360f594cf")}catch(e){}}();
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="2280adab-4217-5f6e-a4bf-0cf516dba154")}catch(e){}}();
 import moment from 'moment-timezone';
 import logger from '../logger.js';
 import settingsDB from '../db/settings.js';
 import { connectFranken } from './frankenServer.js';
 import { wait } from './promises.js';
-import { MAX_TARGET_TEMPERATURE_F, MIN_TARGET_TEMPERATURE_F, Version, } from '../routes/deviceStatus/deviceStatusSchema.js';
+import { Version } from '../routes/deviceStatus/deviceStatusSchema.js';
 import { GestureSchema } from '../db/settingsSchema.js';
-import { countNewGestures, processSideGestures } from './gestures.js';
+import { countNewGestures } from './gestures.js';
+import { runSideGestures } from './gestureActions.js';
 import config from '../config.js';
-import { handleAlarmGesture } from '../jobs/alarmSession.js';
-import { alarmSession } from '../jobs/alarmScheduler.js';
-import { updateDeviceStatus } from '../routes/deviceStatus/updateDeviceStatus.js';
 import serverStatus from '../serverStatus.js';
 const SIDES = ['left', 'right'];
 // Pods without tap support only need an occasional status refresh
@@ -44,38 +42,6 @@ export class FrankenMonitor {
         logger.debug('Stopping FrankenMonitor loop');
         this.isRunning = false;
     }
-    // Runs the configured actions for every tap gesture a side made since the last poll.
-    async processGesturesForSide(nextDeviceStatus, side) {
-        try {
-            await processSideGestures({
-                previousTaps: this.deviceStatus?.[side].taps,
-                nextTaps: nextDeviceStatus[side].taps,
-                tapSettings: settingsDB.data[side].taps,
-                targetTemperatureF: nextDeviceStatus[side].targetTemperatureF,
-                temperatureLimits: { minTemperatureF: MIN_TARGET_TEMPERATURE_F, maxTemperatureF: MAX_TARGET_TEMPERATURE_F },
-                actions: {
-                    setTargetTemperature: async (temperatureF) => {
-                        logger.debug(`Processing gesture temperature change for ${side} -> ${temperatureF}`);
-                        await updateDeviceStatus({ [side]: { targetTemperatureF: temperatureF } });
-                    },
-                    runAlarmGesture: async (tapConfig) => {
-                        const result = await handleAlarmGesture(tapConfig, {
-                            isAlarmVibrating: nextDeviceStatus[side].isAlarmVibrating,
-                            isSideOn: nextDeviceStatus[side].isOn,
-                            // Same paths the app uses to dismiss an alarm and for its power button
-                            dismissAlarm: () => updateDeviceStatus({ [side]: { isAlarmVibrating: false } }),
-                            snoozeAlarm: snoozeSeconds => alarmSession.snooze(side, snoozeSeconds),
-                            setPower: isOn => updateDeviceStatus({ [side]: { isOn } }),
-                        });
-                        logger.debug(`Processed alarm gesture for ${side}: ${result}`);
-                    },
-                },
-            });
-        }
-        catch (error) {
-            logger.error(error);
-        }
-    }
     // True when any tap counter moved forward, so settings are only read from disk when needed.
     hasNewGestures(nextDeviceStatus) {
         return SIDES.some(side => GestureSchema.options.some(gesture => (countNewGestures(this.deviceStatus?.[side].taps?.[gesture], nextDeviceStatus[side].taps?.[gesture]) > 0)));
@@ -89,7 +55,7 @@ export class FrankenMonitor {
             return;
         await settingsDB.read();
         for (const side of SIDES) {
-            await this.processGesturesForSide(nextDeviceStatus, side);
+            await runSideGestures(side, nextDeviceStatus, this.deviceStatus[side].taps, nextDeviceStatus[side].taps);
         }
     }
     async frankenLoop() {
@@ -137,4 +103,4 @@ export class FrankenMonitor {
     }
 }
 //# sourceMappingURL=frankenMonitor.js.map
-//# debugId=7a486643-87b4-56b8-bec7-2d7360f594cf
+//# debugId=2280adab-4217-5f6e-a4bf-0cf516dba154

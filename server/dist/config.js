@@ -1,5 +1,5 @@
 
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="6bb777aa-a230-5e4e-944c-e1f4c90b8d88")}catch(e){}}();
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="2510f531-b116-53b9-82d2-13bf6b608eca")}catch(e){}}();
 import { existsSync, readFileSync } from 'fs';
 import logger from './logger.js';
 function checkIfDacSockPathConfigured() {
@@ -46,6 +46,8 @@ class Config {
     remoteDevMode;
     dacSockPath;
     gesturePollIntervalMs;
+    // systemd unit whose journal carries Eight Sleep's firmware log (read for Pod 5 button presses)
+    firmwareLogUnit;
     constructor() {
         if (!process.env.DATA_FOLDER || !process.env.ENV) {
             throw new Error('Missing DATA_FOLDER || ENV in env');
@@ -55,6 +57,7 @@ class Config {
         this.dbFolder = process.env.DATA_FOLDER;
         this.lowDbFolder = `${this.dbFolder}lowdb/`;
         this.gesturePollIntervalMs = loadGesturePollIntervalMs();
+        this.firmwareLogUnit = process.env.FIRMWARE_LOG_UNIT || 'frank';
     }
     detectSockPath() {
         const dacSockPath = checkIfDacSockPathConfigured();
@@ -82,4 +85,4 @@ class Config {
 }
 export default Config.getInstance();
 //# sourceMappingURL=config.js.map
-//# debugId=6bb777aa-a230-5e4e-944c-e1f4c90b8d88
+//# debugId=2510f531-b116-53b9-82d2-13bf6b608eca

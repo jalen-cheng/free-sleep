@@ -37,6 +37,7 @@ with unit tests and the demo UI only.
 | [#5](https://github.com/jalen-cheng/free-sleep/pull/5) | Feature | Tap settings reduced to one set of controls for both sides: a temperature step, what the third gesture does during an alarm, and what it does otherwise. Fixes labels breaking mid-word. |
 | [#6](https://github.com/jalen-cheng/free-sleep/pull/6) | Feature | Level (-10 to +10) as a display unit next to °F and °C, everywhere a temperature is shown or picked. Fixes the schedule chart axis in °C. |
 | [#7](https://github.com/jalen-cheng/free-sleep/pull/7) | Tooling | `collect_temperature_calibration.py`, which measures the real temperature at each level. First version of this file. |
+| [#12](https://github.com/jalen-cheng/free-sleep/pull/12) | Feature | Pod 5 side buttons. A monitor follows the firmware's log, where a Pod 5 reports each press, and runs the same settings the tap gestures use. Holding the middle button two seconds switches the side on or off. Settings name the buttons on a Pod 5. |
 
 ## Compared with the Eight Sleep app
 
@@ -49,7 +50,7 @@ The Eight Sleep column is from memory and public material, not from testing the 
 | Schedules | Bedtime, night and wake phases | Per-day power on/off, any number of timed changes, copy to other days. |
 | Both sides together | Per account | Link button for temperature, power and schedules. |
 | Alarm | Vibration and thermal, snooze in app | Vibration with an alarm temperature. Snooze only from the bed, no snooze button in the app. |
-| Side buttons (Pod 5) | + warms, - cools, middle is configurable | Code handles Pod 4 style tap counts only. How Pod 5 buttons are reported is unverified. |
+| Side buttons (Pod 5) | + warms, - cools, middle is configurable | + and - step the temperature, the middle button dismisses or snoozes an alarm, and holding it two seconds switches the side on or off. Built from other owners' reports; unverified on a Pod. |
 | Sleep data | Stages, score, snoring | Time in bed, heart rate, HRV, breathing, movement. |
 | Base and speakers | Elevation, snore mitigation, audio | Not supported. |
 | Remote access | Anywhere, through Eight Sleep's cloud | Home network only. Tailscale is planned, not built. |
@@ -143,7 +144,7 @@ Searched 2026-11-13. These are other people's reports, not verified here.
 ## Later
 
 ### Depends on what the Pod shows
-- [ ] **Buttons.** Add a reader for the Pod 5 button lines in the firmware log (see the table above), mapped onto the existing settings: + and - step the temperature, the middle button handles the alarm, and a long hold of the middle button toggles power.
+- [ ] **Buttons.** The Pod 5 button reader is built from other owners' reports of the log format. Confirm it against the lines your Pod prints, and adjust the patterns in `server/src/8sleep/buttonEvents.ts` if they differ.
 - [ ] **Dismiss.** If sending `ALARM_CLEAR` with a side stops a vibrating alarm, switch dismiss and snooze to it.
 - [ ] **Pod 4 tap fields.** Treat a large jump in a tap field as one tap, for firmware that reports a time instead of a count.
 - [ ] **Calibration.** Confirm the sensor unit (assumed hundredths of a degree Celsius), choose which sensor defines "the temperature", and replace the even 55-110°F spread in `loadDeviceStatus.ts` and `updateDeviceStatus.ts` with the measured curve, stored per Pod.
