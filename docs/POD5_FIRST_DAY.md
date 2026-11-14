@@ -16,7 +16,9 @@ so paste the actual output rather than a summary.
   closest guide. **Take photos as you open the Pod 5**, especially of the board and where the
   tag-connect footprint is. They are worth adding to this repo.
 - The install commands are the same for Pod 4 and Pod 5 according to INSTALLATION.md.
-- How the Pod 5's three side buttons are reported is unknown. Part 4 finds out.
+- Other Pod 5 owners report that the + and - buttons do nothing under Free Sleep, and that the
+  firmware writes each press to its own log instead of the tap counters. Part 4 confirms this on
+  your Pod.
 - **A newer Pod 5 bootloader may block the install.** Upstream
   [issue #66](https://github.com/throwaway31265/free-sleep/issues/66) (open, no answer yet)
   reports a Pod 5 whose bootloader, built in March 2025, never shows the
@@ -153,7 +155,10 @@ The Pod stays unplugged until step 4.
 8. **Leave the hub open and the serial cable attached** until Part 5 is done. If the firewall
    step ever locks you out of the network, the serial cable is the way back in.
 9. Reconnect the cover's hose. The UI should stop being greyed out.
-10. **Feel test.** Set one side to the highest temperature and the other to the lowest. After
+10. **If the UI shows 55° and the bed never changes temperature:** other Pod 5 owners hit this
+    after a fresh install and fixed it by updating a firmware component. Search the project
+    Discord's #support channel for `55` and follow that thread before going further.
+11. **Feel test.** Set one side to the highest temperature and the other to the lowest. After
     ten minutes the two sides should feel clearly different.
 
 Use SSH from here on. Everything below is typed in an SSH session on the Pod unless it says "on the Mac".
@@ -171,7 +176,14 @@ Do this before blocking the internet, so only one thing is changing at a time.
    curl -s localhost:3000/api/deviceStatus/raw > /tmp/status_0.txt; cat /tmp/status_0.txt
    ```
    Look for `doubleTap`, `tripleTap` and `quadTap` lines. Those are the only inputs the code reads today.
-3. Press **left +** once. Wait five seconds. Record:
+3. Session three, watch the firmware's own log. Other Pod 5 owners see button presses here:
+   ```
+   journalctl -u frank -f -o cat | grep -iE "button|TTC|tap"
+   ```
+   Expected, from their reports: a line like `[TTC] processing [button] side left { button: top, type: short`
+   for each press (top is +, bottom is -), and `[buttons] middle button held for <N>ms` for the middle one.
+4. Press **left +** once. Wait five seconds. Record:
+   - the line session three printed, exactly
    - anything new the probe printed (the subject name and the preview)
    - what changed in the status since the baseline:
      ```
@@ -179,9 +191,9 @@ Do this before blocking the internet, so only one thing is changing at a time.
      ```
      Use a new file number for each press and diff against the previous one. Temperature and
      timer lines change on their own; anything else that changes is the button.
-4. Repeat for **left -**, **left middle**, **right +**, **right -**, **right middle**. One press each, five seconds apart.
-5. Then on one side: a **double press** of the middle button, and a **press and hold** for two seconds. Record both.
-6. Stop the probe with Ctrl+C. It prints how many high-rate messages it hid; record that too.
+5. Repeat for **left -**, **left middle**, **right +**, **right -**, **right middle**. One press each, five seconds apart.
+6. Then on one side: a **double press** of the middle button, and a **press and hold** for two seconds. Record both.
+7. Stop the probe with Ctrl+C. It prints how many high-rate messages it hid; record that too.
 
 What the result means:
 
@@ -189,7 +201,8 @@ What the result means:
 |---|---|
 | `doubleTap`, `tripleTap` or `quadTap` goes up by one per press, a different one per button | The buttons already work. The settings only need renaming. |
 | Some other status line changes, or the probe prints a new line per press | The buttons are reported elsewhere. Needs new code to read them. |
-| Neither changes | Free Sleep currently sees nothing from the buttons. Keep the status files and stop here. |
+| The firmware log prints a line per press, nothing else changes | What other owners report. Free Sleep needs a reader for that log; the lines you recorded are its test data. |
+| Nothing changes anywhere | Free Sleep currently sees nothing from the buttons. Keep the status files and stop here. |
 | Hold or double press looks different from a single press | Holds can be given their own action. |
 
 Also check whether the buttons changed the temperature on their own, with no Free Sleep action,
@@ -249,8 +262,13 @@ From the UI on your phone.
    - Does the Dismiss button in the app stop it, or does the bed keep vibrating after the dialog closes?
      Upstream [issue #54](https://github.com/throwaway31265/free-sleep/issues/54) found that on a
      Pod 3 the dismiss command does nothing to an alarm that is already vibrating. If yours keeps
-     vibrating, try this while it is going and record whether it stops within a few seconds
-     (use the side that is vibrating):
+     vibrating, try these two while it is going, one per alarm, and record which one stops it
+     and how fast. First, the dismiss command with a side, as a related project sends it
+     (`0` is left, `1` is right):
+     ```
+     curl -s -X POST localhost:3000/api/execute -H 'Content-Type: application/json' -d '{"command":"ALARM_CLEAR","arg":"0"}'
+     ```
+     Second, a new one-second alarm on the side that is vibrating:
      ```
      curl -s -X POST localhost:3000/api/alarm -H 'Content-Type: application/json' -d '{"side":"left","vibrationIntensity":1,"vibrationPattern":"double","duration":1}'
      ```

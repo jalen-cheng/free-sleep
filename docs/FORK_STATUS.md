@@ -125,12 +125,27 @@ From the upstream issue tracker and open pull requests, checked 2026-11-13.
 | [PR 51](https://github.com/throwaway31265/free-sleep/pull/51), [PR 60](https://github.com/throwaway31265/free-sleep/pull/60) | With the block on, the clock stopped syncing on a network whose DNS servers were public addresses, because DNS was blocked. | Fixed here the same way: DNS is allowed to any resolver. This fork's rules already cover the other findings in PR 60 (IPv6 neighbor discovery, and removing Sentry rules when it is switched back off). |
 | [#62](https://github.com/throwaway31265/free-sleep/issues/62), [#63](https://github.com/throwaway31265/free-sleep/issues/63) | On some Pod 4s the installer cannot find the firmware socket path and the server silently uses the Pod 3 path. | Not changed here. If the UI stays greyed out with the cover connected, check `fs-debug` for the socket path. |
 
-The project's Discord has not been checked.
+### From the project's Discord and other Pod 5 owners
+
+Searched 2026-11-13. These are other people's reports, not verified here.
+
+| Finding | Source | Effect here |
+|---|---|---|
+| **Newer Pod 5 units cannot be rooted this way.** Several owners report no autoboot prompt. One bought in June could interrupt the boot; the view in the server is that newer units ship with it disabled and older ones have not been patched so far. | #support, #general, Sept to Nov 2026 | Same blocker as upstream #66. Whether yours is affected depends on when it was made. |
+| **Pod 5 buttons do nothing under Free Sleep.** An owner on current `main` gets the haptic click from + and - but no temperature change. | #support, 1 Nov 2026 | The tap features in this fork will not respond to the Pod 5's + and - buttons as they stand. |
+| **Pod 5 buttons show up in the firmware's log, not in the tap counters.** Another owner's fork reads `journalctl -u frank` for lines such as `[TTC] processing [button] side left { button: top, type: short` (top is +, bottom is -, plus middle) and `[buttons] middle button held for <N>ms`. | [seanpasino/free-sleep](https://github.com/seanpasino/free-sleep), branch `seanpasino/personal`, `server/src/8sleep/buttonMonitor.ts` | This is how to read the buttons, including how long the middle one was held. Needs a new reader in this fork. |
+| **The dismiss command takes a side.** A related project sends `ALARM_CLEAR` with `0` (left) or `1` (right). Free Sleep sends the word `empty`, which may be why upstream #54 sees no effect. | [sleepypod/core docs/hardware/alarms.md](https://github.com/sleepypod/core/blob/6cf0c24fa793b0cda78d4ab5c299cff4dbfd926a/docs/hardware/alarms.md) | A likely fix for dismiss. To be tried on the Pod. |
+| **The firmware stops a vibrating alarm by itself on any tap**, and that tap can be missing from the status counters. | same document | Dismiss-by-tap may already work without Free Sleep; snooze-by-tap may never see the tap. |
+| **On some Pod 4 firmware the tap fields hold the time of the last tap, not a count.** | same document | This fork would read one tap as three (it caps a jump at three). Needs handling before Pod 4 use. |
+| **A fresh Pod 5 install can show 55° and never change temperature** until a firmware component is updated. | #support, 1 Nov 2026 ("look up '55'") | If the bed does not respond after install, search the Discord's #support for `55`. |
+| **Tailscale on the Pod works, but the firewall has to be opened for it by hand**, with long lists of addresses. | #support, #general, Mar to Apr 2026 | Matches the plan to allow Tailscale by program instead of by address. |
 
 ## Later
 
 ### Depends on what the Pod shows
-- [ ] **Buttons.** Rename the tap settings to the Pod 5 buttons, or read the buttons from wherever the firmware reports them.
+- [ ] **Buttons.** Add a reader for the Pod 5 button lines in the firmware log (see the table above), mapped onto the existing settings: + and - step the temperature, the middle button handles the alarm, and a long hold of the middle button toggles power.
+- [ ] **Dismiss.** If sending `ALARM_CLEAR` with a side stops a vibrating alarm, switch dismiss and snooze to it.
+- [ ] **Pod 4 tap fields.** Treat a large jump in a tap field as one tap, for firmware that reports a time instead of a count.
 - [ ] **Calibration.** Confirm the sensor unit (assumed hundredths of a degree Celsius), choose which sensor defines "the temperature", and replace the even 55-110°F spread in `loadDeviceStatus.ts` and `updateDeviceStatus.ts` with the measured curve, stored per Pod.
 - [ ] **Remote access.** If the read-only checks pass, run Tailscale on the Pod behind a "Remote access" switch, with only Tailscale's own traffic allowed out.
 
